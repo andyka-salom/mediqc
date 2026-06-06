@@ -17,11 +17,13 @@ class FormSection extends Model
         'description',
         'order_index',
         'is_active',
+        'hidden_by_default',
     ];
 
     protected $casts = [
         'order_index' => 'integer',
         'is_active'   => 'boolean',
+        'hidden_by_default' => 'boolean',
     ];
 
     public function formTemplate(): BelongsTo

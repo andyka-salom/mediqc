@@ -108,7 +108,11 @@ class FormTemplateController extends Controller
                 ->with('error', 'Template tidak dapat dihapus karena sudah memiliki data pengisian QC.');
         }
 
-        $template->delete();
+        DB::transaction(function () use ($template) {
+            // Delete associated schedules first to prevent foreign key violation
+            $template->schedules()->delete();
+            $template->delete();
+        });
 
         return redirect()->route('admin.templates.index')
             ->with('success', 'Template berhasil dihapus.');
@@ -150,6 +154,7 @@ class FormTemplateController extends Controller
             'sections.*.title' => 'required|string|max:200',
             'sections.*.description' => 'nullable|string',
             'sections.*.order_index' => 'required|integer',
+            'sections.*.hidden_by_default' => 'nullable|boolean',
             'sections.*.fields' => 'present|array',
         ]);
 
@@ -179,6 +184,7 @@ class FormTemplateController extends Controller
                         'title' => $sec['title'],
                         'description' => $sec['description'] ?? null,
                         'order_index' => $sec['order_index'] ?? $sectionIndex,
+                        'hidden_by_default' => (bool) ($sec['hidden_by_default'] ?? false),
                     ]);
                     $processedSectionIds[] = $section->id;
                     $sectionIdMap[$secId] = $section->id;
@@ -189,6 +195,7 @@ class FormTemplateController extends Controller
                         'title' => $sec['title'],
                         'description' => $sec['description'] ?? null,
                         'order_index' => $sec['order_index'] ?? $sectionIndex,
+                        'hidden_by_default' => (bool) ($sec['hidden_by_default'] ?? false),
                     ]);
                     $processedSectionIds[] = $section->id;
                     if ($secId) {

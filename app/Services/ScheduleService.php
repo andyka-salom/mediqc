@@ -19,9 +19,8 @@ class ScheduleService
     public function generateForPeriod(QcType $qcType, ?Carbon $reference = null): int
     {
         $reference = $reference ?: now();
-        [$periodStart, $periodEnd, $dueDate, $periodLabel] = $this->resolvePeriod($qcType, $reference);
 
-        return DB::transaction(function () use ($qcType, $periodStart, $periodEnd, $dueDate) {
+        return DB::transaction(function () use ($qcType, $reference) {
             $units = EquipmentUnit::with('equipmentType')
                 ->where('is_active', true)
                 ->where('status', 'aktif')
@@ -29,6 +28,16 @@ class ScheduleService
 
             $created = 0;
             foreach ($units as $unit) {
+                if (! $unit->qcTypeEnabled($qcType->value)) {
+                    continue;
+                }
+
+                if (! $this->shouldGenerateForUnit($unit, $qcType, $reference)) {
+                    continue;
+                }
+
+                [$periodStart, $periodEnd, $dueDate] = $this->resolvePeriodForUnit($unit, $qcType, $reference);
+
                 $template = FormTemplate::published()
                     ->where('equipment_type_id', $unit->equipment_type_id)
                     ->where('qc_type', $qcType->value)
@@ -91,6 +100,58 @@ class ScheduleService
                 $ref->copy()->format('Y'),
             ],
         };
+    }
+
+    protected function resolvePeriodForUnit(EquipmentUnit $unit, QcType $qcType, Carbon $ref): array
+    {
+        $interval = $unit->qcIntervalValue($qcType->value);
+
+        return match ($qcType) {
+            QcType::HARIAN => [
+                $ref->copy()->startOfDay()->toDateString(),
+                $ref->copy()->addDays($interval - 1)->endOfDay()->toDateString(),
+                $ref->copy()->addDays($interval - 1)->endOfDay()->toDateString(),
+                $ref->copy()->toDateString(),
+            ],
+            QcType::BULANAN => [
+                $ref->copy()->startOfMonth()->toDateString(),
+                $ref->copy()->addMonthsNoOverflow($interval - 1)->endOfMonth()->toDateString(),
+                $ref->copy()->addMonthsNoOverflow($interval - 1)->endOfMonth()->toDateString(),
+                $ref->copy()->format('Y-m'),
+            ],
+            QcType::TAHUNAN => [
+                $ref->copy()->startOfMonth()->toDateString(),
+                $ref->copy()->addMonthsNoOverflow($interval - 1)->endOfMonth()->toDateString(),
+                $ref->copy()->addMonthsNoOverflow($interval - 1)->endOfMonth()->toDateString(),
+                $ref->copy()->format('Y-m'),
+            ],
+        };
+    }
+
+    protected function shouldGenerateForUnit(EquipmentUnit $unit, QcType $qcType, Carbon $ref): bool
+    {
+        $latestSchedule = QcSchedule::where('equipment_unit_id', $unit->id)
+            ->where('qc_type', $qcType->value)
+            ->orderByDesc('period_start')
+            ->first();
+
+        if (! $latestSchedule) {
+            return true;
+        }
+
+        $interval = $unit->qcIntervalValue($qcType->value);
+        $lastPeriodStart = $latestSchedule->period_start->copy()->startOfDay();
+        $nextAllowedStart = match ($qcType) {
+            QcType::HARIAN => $lastPeriodStart->addDays($interval),
+            QcType::BULANAN, QcType::TAHUNAN => $lastPeriodStart->addMonthsNoOverflow($interval)->startOfMonth(),
+        };
+
+        $referenceStart = match ($qcType) {
+            QcType::HARIAN => $ref->copy()->startOfDay(),
+            QcType::BULANAN, QcType::TAHUNAN => $ref->copy()->startOfMonth(),
+        };
+
+        return $referenceStart->gte($nextAllowedStart);
     }
 
     public function markOverdue(): int

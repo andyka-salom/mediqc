@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 // ────────────── Types ──────────────
 
@@ -64,6 +65,7 @@ interface SectionData {
     title: string;
     description: string;
     order_index: number;
+    hidden_by_default: boolean;
     fields: FieldData[];
 }
 
@@ -83,6 +85,7 @@ interface FormTemplateData {
         title: string;
         description: string | null;
         order_index: number;
+        hidden_by_default: boolean;
         fields: Array<{
             id: number;
             code: string | null;
@@ -148,6 +151,7 @@ export default function Builder({ template }: BuilderProps) {
             title: s.title,
             description: s.description || '',
             order_index: si,
+            hidden_by_default: s.hidden_by_default || false,
             fields: s.fields.map((f, fi) => ({
                 id: f.id,
                 code: f.code || '',
@@ -172,6 +176,12 @@ export default function Builder({ template }: BuilderProps) {
     const [saving, setSaving] = useState(false);
     const [expandedField, setExpandedField] = useState<string | null>(null);
     const [collapsedSections, setCollapsedSections] = useState<Set<string | number>>(new Set());
+    const [confirmSectionDelete, setConfirmSectionDelete] = useState<{ isOpen: boolean; section: SectionData | null }>({ isOpen: false, section: null });
+    const [confirmFieldDelete, setConfirmFieldDelete] = useState<{
+        isOpen: boolean;
+        sectionId: string | number | null;
+        field: FieldData | null;
+    }>({ isOpen: false, sectionId: null, field: null });
 
     // ────── Section Handlers ──────
 
@@ -181,6 +191,7 @@ export default function Builder({ template }: BuilderProps) {
             title: `Seksi ${prev.length + 1}`,
             description: '',
             order_index: prev.length,
+            hidden_by_default: false,
             fields: [],
         }]);
     };
@@ -190,9 +201,15 @@ export default function Builder({ template }: BuilderProps) {
     };
 
     const removeSection = (sectionId: string | number) => {
-        if (confirm('Hapus seksi ini beserta semua field di dalamnya?')) {
-            setSections(prev => prev.filter(s => s.id !== sectionId));
-        }
+        const section = sections.find(s => s.id === sectionId) || null;
+        setConfirmSectionDelete({ isOpen: true, section });
+    };
+
+    const executeRemoveSection = () => {
+        if (!confirmSectionDelete.section) return;
+
+        setSections(prev => prev.filter(s => s.id !== confirmSectionDelete.section?.id));
+        setConfirmSectionDelete({ isOpen: false, section: null });
     };
 
     const moveSection = (index: number, direction: -1 | 1) => {
@@ -254,10 +271,19 @@ export default function Builder({ template }: BuilderProps) {
     };
 
     const removeField = (sectionId: string | number, fieldId: string | number) => {
+        const section = sections.find(s => s.id === sectionId);
+        const field = section?.fields.find(f => f.id === fieldId) || null;
+        setConfirmFieldDelete({ isOpen: true, sectionId, field });
+    };
+
+    const executeRemoveField = () => {
+        if (!confirmFieldDelete.sectionId || !confirmFieldDelete.field) return;
+
         setSections(prev => prev.map(s => {
-            if (s.id !== sectionId) return s;
-            return { ...s, fields: s.fields.filter(f => f.id !== fieldId) };
+            if (s.id !== confirmFieldDelete.sectionId) return s;
+            return { ...s, fields: s.fields.filter(f => f.id !== confirmFieldDelete.field?.id) };
         }));
+        setConfirmFieldDelete({ isOpen: false, sectionId: null, field: null });
     };
 
     const moveField = (sectionId: string | number, fieldIndex: number, direction: -1 | 1) => {
@@ -297,6 +323,7 @@ export default function Builder({ template }: BuilderProps) {
                 title: s.title,
                 description: s.description || null,
                 order_index: si,
+                hidden_by_default: s.hidden_by_default,
                 fields: s.fields.map((f, fi) => ({
                     id: f.id,
                     code: f.code || null,
@@ -567,7 +594,17 @@ export default function Builder({ template }: BuilderProps) {
                                         onChange={e => updateSection(section.id, 'title', e.target.value)}
                                         className="flex-1 bg-transparent text-sm font-bold text-slate-900 dark:text-white outline-none placeholder-slate-400"
                                         placeholder="Nama Seksi" />
+                                    {section.hidden_by_default && (
+                                        <span className="text-[9px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-1.5 py-0.5 rounded font-bold shrink-0">OPSIONAL</span>
+                                    )}
                                     <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-500 px-1.5 py-0.5 rounded font-bold">{section.fields.length} field</span>
+                                    
+                                    <label className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer select-none shrink-0">
+                                        <input type="checkbox" checked={section.hidden_by_default}
+                                            onChange={e => updateSection(section.id, 'hidden_by_default', e.target.checked)}
+                                            className="size-3.5 text-indigo-600 focus:ring-indigo-500 border-slate-350 rounded cursor-pointer" />
+                                        <span>Sembunyikan Default</span>
+                                    </label>
                                     <div className="flex gap-1">
                                         <button onClick={() => moveSection(sectionIndex, -1)} disabled={sectionIndex === 0}
                                             className="p-1 text-slate-400 hover:text-slate-600 disabled:opacity-30 transition-colors cursor-pointer disabled:cursor-not-allowed">
@@ -717,7 +754,7 @@ export default function Builder({ template }: BuilderProps) {
                                                                         <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Wajib diisi</span>
                                                                         <input type="checkbox" checked={field.is_required}
                                                                             onChange={e => updateField(section.id, field.id, 'is_required', e.target.checked)}
-                                                                            className="size-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer" />
+                                                                            className="size-4 text-indigo-600 focus:ring-indigo-500 border-slate-350 rounded cursor-pointer" />
                                                                     </div>
 
                                                                     {/* Options editor */}
@@ -779,6 +816,26 @@ export default function Builder({ template }: BuilderProps) {
                     </Button>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmSectionDelete.isOpen}
+                onClose={() => setConfirmSectionDelete({ isOpen: false, section: null })}
+                onConfirm={executeRemoveSection}
+                title="Hapus Seksi"
+                message={`Hapus seksi "${confirmSectionDelete.section?.title}"?\n\nSemua field di dalam seksi ini juga akan dihapus dari struktur form saat disimpan.`}
+                confirmText="Hapus Seksi"
+                variant="danger"
+            />
+
+            <ConfirmModal
+                isOpen={confirmFieldDelete.isOpen}
+                onClose={() => setConfirmFieldDelete({ isOpen: false, sectionId: null, field: null })}
+                onConfirm={executeRemoveField}
+                title="Hapus Field"
+                message={`Hapus field "${confirmFieldDelete.field?.label}" dari struktur form?`}
+                confirmText="Hapus Field"
+                variant="danger"
+            />
         </AuthenticatedLayout>
     );
 }

@@ -17,14 +17,9 @@ class RoleSeeder extends Seeder
                 'description' => 'Akses penuh ke seluruh sistem',
                 'permissions' => [
                     'qc.submit' => '*',
-                    'qc.view_own' => true,
-                    'qc.view_all' => true,
-                    'qc.review' => false, // tidak ada approval sama sekali
                     'template.manage' => true,
                     'equipment.manage' => true,
                     'user.manage' => true,
-                    'report.view' => true,
-                    'audit.view' => true,
                 ],
             ],
             [
@@ -33,12 +28,9 @@ class RoleSeeder extends Seeder
                 'description' => 'Petugas pencatatan & tracking QC alat medis',
                 'permissions' => [
                     'qc.submit' => ['harian', 'bulanan', 'tahunan'],
-                    'qc.view_own' => true,
-                    'qc.view_all' => true,
-                    'qc.review' => false,
                     'template.manage' => false,
                     'equipment.manage' => false,
-                    'report.view' => true,
+                    'user.manage' => false,
                 ],
             ],
             [
@@ -47,12 +39,9 @@ class RoleSeeder extends Seeder
                 'description' => 'Petugas pencatatan & tracking QC alat medis',
                 'permissions' => [
                     'qc.submit' => ['harian', 'bulanan', 'tahunan'],
-                    'qc.view_own' => true,
-                    'qc.view_all' => true,
-                    'qc.review' => false,
                     'template.manage' => false,
                     'equipment.manage' => false,
-                    'report.view' => true,
+                    'user.manage' => false,
                 ],
             ],
             [
@@ -61,12 +50,9 @@ class RoleSeeder extends Seeder
                 'description' => 'Petugas pencatatan & tracking QC alat medis',
                 'permissions' => [
                     'qc.submit' => ['harian', 'bulanan', 'tahunan'],
-                    'qc.view_own' => true,
-                    'qc.view_all' => true,
-                    'qc.review' => false,
                     'template.manage' => false,
                     'equipment.manage' => false,
-                    'report.view' => true,
+                    'user.manage' => false,
                 ],
             ],
         ];

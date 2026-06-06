@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import {
@@ -50,6 +50,7 @@ interface PaginatedData<T> {
 interface SelectUnitProps {
     units: PaginatedData<EquipmentUnit>;
     todaysSubmissions: Record<number, Submission[]>;
+    qcAvailability: Record<number, Record<string, QcAvailability>>;
     allowedQcTypes: string[];
     equipmentTypes: EquipmentType[];
     filters: {
@@ -58,26 +59,49 @@ interface SelectUnitProps {
     };
 }
 
+interface QcAvailability {
+    enabled: boolean;
+    interval: number;
+    interval_unit: string;
+    last_submission_date: string | null;
+    last_submission_date_label: string | null;
+    next_due_date: string;
+    next_due_date_label: string;
+    is_due: boolean;
+}
+
 const qcTypeConfig: Record<string, { label: string; bg: string; text: string }> = {
     harian: { label: 'Harian', bg: 'bg-blue-100 dark:bg-blue-950/40', text: 'text-blue-700 dark:text-blue-400' },
     bulanan: { label: 'Bulanan', bg: 'bg-purple-100 dark:bg-purple-950/40', text: 'text-purple-700 dark:text-purple-400' },
     tahunan: { label: 'Tahunan', bg: 'bg-indigo-100 dark:bg-indigo-950/40', text: 'text-indigo-700 dark:text-indigo-400' },
 };
 
-export default function SelectUnit({ units, todaysSubmissions, allowedQcTypes, equipmentTypes, filters }: SelectUnitProps) {
+const qcTypeOrder = ['harian', 'bulanan', 'tahunan'];
+
+export default function SelectUnit({ units, todaysSubmissions, qcAvailability, allowedQcTypes, equipmentTypes, filters }: SelectUnitProps) {
     const [search, setSearch] = useState(filters.search || '');
     const [typeFilter, setTypeFilter] = useState(filters.equipment_type_id || '');
+    const availableTabs = qcTypeOrder.filter(type => allowedQcTypes.includes(type));
+    const [activeQcType, setActiveQcType] = useState(availableTabs[0] || allowedQcTypes[0] || 'harian');
 
-    const handleSearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        router.get(route('qc.select-unit'), { search, equipment_type_id: typeFilter }, { preserveState: true });
-    };
+    useEffect(() => {
+        const timeout = window.setTimeout(() => {
+            router.get(
+                route('qc.select-unit'),
+                {
+                    search: search.trim() || undefined,
+                    equipment_type_id: typeFilter || undefined,
+                },
+                {
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                }
+            );
+        }, 300);
 
-    const resetFilters = () => {
-        setSearch('');
-        setTypeFilter('');
-        router.get(route('qc.select-unit'));
-    };
+        return () => window.clearTimeout(timeout);
+    }, [search, typeFilter]);
 
     return (
         <AuthenticatedLayout>
@@ -94,7 +118,7 @@ export default function SelectUnit({ units, todaysSubmissions, allowedQcTypes, e
 
                 {/* Filters */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-xs">
-                    <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4">
+                    <div className="flex flex-col md:flex-row gap-4">
                         <div className="flex-1 relative">
                             <Search className="absolute left-3 top-2.5 size-4 text-slate-400" />
                             <input
@@ -117,12 +141,38 @@ export default function SelectUnit({ units, todaysSubmissions, allowedQcTypes, e
                                 ))}
                             </select>
                         </div>
-                        <div className="flex gap-2">
-                            <Button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white">Cari</Button>
-                            <Button type="button" variant="outline" onClick={resetFilters}>Reset</Button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
+
+                {/* QC Type Tabs */}
+                {allowedQcTypes.length > 0 && (
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1.5 shadow-xs">
+                        <div className="grid grid-cols-3 gap-1">
+                            {qcTypeOrder.map(qcType => {
+                                const config = qcTypeConfig[qcType];
+                                const isAllowed = allowedQcTypes.includes(qcType);
+                                const isActive = activeQcType === qcType;
+
+                                return (
+                                    <button
+                                        key={qcType}
+                                        type="button"
+                                        disabled={!isAllowed}
+                                        onClick={() => setActiveQcType(qcType)}
+                                        className={cn(
+                                            "rounded-lg px-4 py-3 text-sm font-bold transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
+                                            isActive
+                                                ? "bg-indigo-600 text-white shadow-sm"
+                                                : "text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/70"
+                                        )}
+                                    >
+                                        {config.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Units List */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -160,21 +210,41 @@ export default function SelectUnit({ units, todaysSubmissions, allowedQcTypes, e
                                 <div className="bg-slate-50/50 dark:bg-slate-950/30 border-t border-slate-100 dark:border-slate-800/50 p-4 space-y-3">
                                     <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Tindakan QC</h4>
                                     
-                                    {allowedQcTypes.length > 0 ? allowedQcTypes.map(qcType => {
+                                    {allowedQcTypes.length > 0 ? [activeQcType].map(qcType => {
                                         const config = qcTypeConfig[qcType] || qcTypeConfig['harian'];
+                                        const availability = qcAvailability[unit.id]?.[qcType];
                                         // Cek apakah sudah ada submission hari ini untuk qcType ini
                                         const submission = submittedToday.find(s => s.qc_type === qcType);
+                                        const disabled = !availability?.enabled || !availability?.is_due;
                                         
                                         return (
                                             <div key={qcType} className="flex items-center justify-between p-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider", config.bg, config.text)}>
-                                                        {config.label}
-                                                    </span>
-                                                    {submission && (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
-                                                            <CheckCircle2 className="size-3" /> Selesai Hari Ini
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider", config.bg, config.text)}>
+                                                            {config.label}
                                                         </span>
+                                                        {submission && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-50 dark:bg-emerald-950/30 px-1.5 py-0.5 rounded">
+                                                                <CheckCircle2 className="size-3" /> Selesai Hari Ini
+                                                            </span>
+                                                        )}
+                                                        {availability && !availability.enabled && (
+                                                            <span className="text-[10px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded font-semibold">
+                                                                Nonaktif
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {availability && (
+                                                        <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+                                                            Interval {availability.interval} {availability.interval_unit}
+                                                            {availability.last_submission_date_label
+                                                                ? ` · Terakhir ${availability.last_submission_date_label}`
+                                                                : ' · Belum pernah QC'}
+                                                            {availability.enabled && !availability.is_due
+                                                                ? ` · Berikutnya ${availability.next_due_date_label}`
+                                                                : ''}
+                                                        </p>
                                                     )}
                                                 </div>
                                                 
@@ -190,6 +260,10 @@ export default function SelectUnit({ units, todaysSubmissions, allowedQcTypes, e
                                                                 <Button variant="outline" size="sm" className="h-7 text-xs border-slate-200">Lihat</Button>
                                                             </Link>
                                                         </div>
+                                                    ) : disabled ? (
+                                                        <Button size="sm" variant="outline" disabled className="h-7 text-xs border-slate-200">
+                                                            {availability?.enabled ? 'Belum Jatuh Tempo' : 'Nonaktif'}
+                                                        </Button>
                                                     ) : (
                                                         // Belum ada submission hari ini
                                                         <Link href={route('qc.create', { unit: unit.id, qc_type: qcType })}>

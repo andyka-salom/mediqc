@@ -3,7 +3,8 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { 
     ArrowLeft, 
     CheckCircle2, 
-    XCircle, 
+    Check,
+    X,
     AlertTriangle, 
     Clock, 
     Calendar, 
@@ -11,7 +12,6 @@ import {
     User, 
     FileSpreadsheet
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 declare const route: any;
@@ -102,7 +102,7 @@ interface ShowProps {
     canEdit: boolean;
 }
 
-export default function Show({ submission, canEdit }: ShowProps) {
+export default function Show({ submission }: ShowProps) {
     const getStatusConfig = (status: string) => {
         switch (status) {
             case 'needs_action':

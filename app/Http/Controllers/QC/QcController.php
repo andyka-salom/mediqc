@@ -7,6 +7,7 @@ use App\Models\EquipmentUnit;
 use App\Models\FormTemplate;
 use App\Models\QcSubmission;
 use App\Services\SubmissionService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
@@ -23,6 +24,7 @@ class QcController extends Controller
     {
         $user = Auth::user();
         $query = QcSubmission::with(['formTemplate', 'equipmentUnit', 'submitter'])
+            ->orderByDesc('submission_date')
             ->orderByDesc('created_at');
 
         // Semua pengguna yang terautentikasi dapat melihat semua submission (tracking bersama)
@@ -46,14 +48,158 @@ class QcController extends Controller
             $query->where('overall_status', $status);
         }
 
+        // Filter tanggal
+        if ($startDate = $request->input('start_date')) {
+            $query->where('submission_date', '>=', $startDate);
+        }
+
+        if ($endDate = $request->input('end_date')) {
+            $query->where('submission_date', '<=', $endDate);
+        }
+
         $submissions = $query->paginate(10)->withQueryString();
 
         return Inertia::render('QC/Index', [
             'submissions' => $submissions,
-            'filters' => $request->only(['search', 'qc_type', 'status']),
+            'filters' => $request->only(['search', 'qc_type', 'status', 'start_date', 'end_date']),
             'isAdmin' => $user->isAdmin(),
             'currentUserId' => $user->id,
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $query = QcSubmission::with(['formTemplate', 'equipmentUnit', 'submitter'])
+            ->orderByDesc('submission_date')
+            ->orderByDesc('created_at');
+
+        // Apply same filters
+        if ($search = $request->input('search')) {
+            $query->whereHas('equipmentUnit', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('merk', 'like', "%{$search}%")
+                  ->orWhere('model', 'like', "%{$search}%")
+                  ->orWhere('asset_code', 'like', "%{$search}%");
+            });
+        }
+
+        if ($qcType = $request->input('qc_type')) {
+            $query->where('qc_type', $qcType);
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('overall_status', $status);
+        }
+
+        if ($startDate = $request->input('start_date')) {
+            $query->where('submission_date', '>=', $startDate);
+        }
+
+        if ($endDate = $request->input('end_date')) {
+            $query->where('submission_date', '<=', $endDate);
+        }
+
+        $submissions = $query->get();
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="riwayat_qc_' . now()->format('Ymd_His') . '.csv"',
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($submissions) {
+            $file = fopen('php://output', 'w');
+            
+            // Write UTF-8 BOM for Excel
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            // Header Row
+            fputcsv($file, [
+                'No',
+                'Tanggal',
+                'Nama Alat Medis',
+                'Kode Aset',
+                'Merk',
+                'Model',
+                'Tipe QC',
+                'Pengisi',
+                'Status',
+                'Jumlah Peringatan',
+                'Catatan Masalah'
+            ], ';');
+            
+            foreach ($submissions as $index => $sub) {
+                $statusLabel = 'Draft';
+                if ($sub->overall_status === 'submitted') {
+                    $statusLabel = 'Tercatat';
+                } elseif ($sub->overall_status === 'needs_action') {
+                    $statusLabel = 'Perlu Tindakan';
+                }
+
+                fputcsv($file, [
+                    $index + 1,
+                    $sub->submission_date,
+                    $sub->equipment_unit ? $sub->equipment_unit->name : '—',
+                    $sub->equipment_unit ? $sub->equipment_unit->asset_code : '—',
+                    $sub->equipment_unit ? $sub->equipment_unit->merk : '—',
+                    $sub->equipment_unit ? $sub->equipment_unit->model : '—',
+                    ucfirst($sub->qc_type),
+                    $sub->submitter ? $sub->submitter->name : '—',
+                    $statusLabel,
+                    $sub->warning_count,
+                    $sub->catatan_masalah ?? '—'
+                ], ';');
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function exportPdf(Request $request)
+    {
+        $query = QcSubmission::with(['formTemplate', 'equipmentUnit', 'submitter'])
+            ->orderByDesc('submission_date')
+            ->orderByDesc('created_at');
+
+        // Apply same filters
+        if ($search = $request->input('search')) {
+            $query->whereHas('equipmentUnit', function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('merk', 'like', "%{$search}%")
+                  ->orWhere('model', 'like', "%{$search}%")
+                  ->orWhere('asset_code', 'like', "%{$search}%");
+            });
+        }
+
+        if ($qcType = $request->input('qc_type')) {
+            $query->where('qc_type', $qcType);
+        }
+
+        if ($status = $request->input('status')) {
+            $query->where('overall_status', $status);
+        }
+
+        if ($startDate = $request->input('start_date')) {
+            $query->where('submission_date', '>=', $startDate);
+        }
+
+        if ($endDate = $request->input('end_date')) {
+            $query->where('submission_date', '<=', $endDate);
+        }
+
+        $submissions = $query->get();
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('exports.qc-history-pdf', [
+            'submissions' => $submissions
+        ]);
+        
+        $pdf->setPaper('a4', 'landscape');
+        
+        return $pdf->download('riwayat_qc_' . now()->format('Ymd_His') . '.pdf');
     }
 
     public function selectUnit(Request $request): Response
@@ -66,11 +212,11 @@ class QcController extends Controller
 
         if ($search = $request->input('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('asset_code', 'like', "%{$search}%")
-                  ->orWhere('merk', 'like', "%{$search}%")
-                  ->orWhere('model', 'like', "%{$search}%")
-                  ->orWhere('ruangan', 'like', "%{$search}%");
+                $q->where('name', 'ilike', "%{$search}%")
+                  ->orWhere('asset_code', 'ilike', "%{$search}%")
+                  ->orWhere('merk', 'ilike', "%{$search}%")
+                  ->orWhere('model', 'ilike', "%{$search}%")
+                  ->orWhere('ruangan', 'ilike', "%{$search}%");
             });
         }
 
@@ -89,6 +235,13 @@ class QcController extends Controller
             ->get()
             ->groupBy('equipment_unit_id');
 
+        $latestSubmissions = QcSubmission::query()
+            ->whereIn('equipment_unit_id', $unitIds)
+            ->whereIn('qc_type', ['harian', 'bulanan', 'tahunan'])
+            ->orderByDesc('submission_date')
+            ->get()
+            ->groupBy(fn (QcSubmission $submission) => $submission->equipment_unit_id.'|'.$submission->qc_type);
+
         // Which QC types is this user allowed to submit?
         $allowedQcTypes = $user->role->permissions['qc.submit'] ?? [];
         if ($allowedQcTypes === '*' || $allowedQcTypes === true) {
@@ -100,6 +253,10 @@ class QcController extends Controller
         return Inertia::render('QC/SelectUnit', [
             'units' => $units,
             'todaysSubmissions' => $todaysSubmissions,
+            'qcAvailability' => $units->getCollection()
+                ->mapWithKeys(fn (EquipmentUnit $unit) => [
+                    $unit->id => $this->buildQcAvailability($unit, $availableQcTypes, $latestSubmissions),
+                ]),
             'allowedQcTypes' => $availableQcTypes,
             'filters' => $request->only(['search', 'equipment_type_id']),
             'equipmentTypes' => \App\Models\EquipmentType::where('is_active', true)->get(),
@@ -116,6 +273,22 @@ class QcController extends Controller
         // Cek otorisasi pengisian tipe QC
         if (!$user->canSubmitQcType($qcType) && !$user->isAdmin()) {
             abort(403, 'Anda tidak memiliki hak akses untuk mengisi QC tipe ' . $qcType);
+        }
+
+        if (! $unit->qcTypeEnabled($qcType)) {
+            return redirect()->route('qc.select-unit')
+                ->with('error', 'QC tipe '.ucfirst($qcType).' belum diaktifkan untuk alat ini.');
+        }
+
+        $latestSubmission = QcSubmission::where('equipment_unit_id', $unit->id)
+            ->where('qc_type', $qcType)
+            ->orderByDesc('submission_date')
+            ->first();
+        $availability = $this->resolveQcAvailability($unit, $qcType, $latestSubmission);
+
+        if (! $availability['is_due']) {
+            return redirect()->route('qc.select-unit')
+                ->with('error', 'QC '.ucfirst($qcType).' untuk alat ini belum jatuh tempo. Jadwal berikutnya: '.$availability['next_due_date_label'].'.');
         }
 
         $today = now()->format('Y-m-d');
@@ -263,5 +436,43 @@ class QcController extends Controller
         // Fitur review/approval telah dinonaktifkan.
         // Sistem QC hanya untuk pencatatan dan tracking.
         abort(403, 'Fitur review/approval tidak tersedia dalam sistem ini.');
+    }
+
+    private function buildQcAvailability(EquipmentUnit $unit, array $allowedQcTypes, $latestSubmissions): array
+    {
+        return collect($allowedQcTypes)
+            ->mapWithKeys(function (string $qcType) use ($unit, $latestSubmissions) {
+                $latest = $latestSubmissions->get($unit->id.'|'.$qcType)?->first();
+
+                return [$qcType => $this->resolveQcAvailability($unit, $qcType, $latest)];
+            })
+            ->all();
+    }
+
+    private function resolveQcAvailability(EquipmentUnit $unit, string $qcType, ?QcSubmission $latestSubmission): array
+    {
+        $enabled = $unit->qcTypeEnabled($qcType);
+        $interval = $unit->qcIntervalValue($qcType);
+        $lastDate = $latestSubmission?->submission_date
+            ? Carbon::parse($latestSubmission->submission_date)->startOfDay()
+            : null;
+
+        $nextDueDate = match ($qcType) {
+            'harian' => $lastDate?->copy()->addDays($interval) ?? now()->startOfDay(),
+            'bulanan' => $lastDate?->copy()->addMonthsNoOverflow($interval)->startOfDay() ?? now()->startOfDay(),
+            'tahunan' => $lastDate?->copy()->addMonthsNoOverflow($interval)->startOfDay() ?? now()->startOfDay(),
+            default => now()->startOfDay(),
+        };
+
+        return [
+            'enabled' => $enabled,
+            'interval' => $interval,
+            'interval_unit' => $qcType === 'harian' ? 'hari' : 'bulan',
+            'last_submission_date' => $lastDate?->toDateString(),
+            'last_submission_date_label' => $lastDate?->translatedFormat('d M Y'),
+            'next_due_date' => $nextDueDate->toDateString(),
+            'next_due_date_label' => $nextDueDate->translatedFormat('d M Y'),
+            'is_due' => $enabled && $nextDueDate->lte(now()->startOfDay()),
+        ];
     }
 }

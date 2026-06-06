@@ -8,10 +8,12 @@ import {
     CheckCircle2, 
     FileText, 
     Clock,
-    Trash2
+    Trash2,
+    FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Submission {
     id: string;
@@ -50,6 +52,8 @@ interface IndexProps {
         search: string;
         qc_type: string;
         status: string;
+        start_date: string;
+        end_date: string;
     };
     isAdmin: boolean;
     currentUserId: string;
@@ -59,6 +63,10 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
     const [search, setSearch] = useState(filters.search || '');
     const [qcType, setQcType] = useState(filters.qc_type || '');
     const [status, setStatus] = useState(filters.status || '');
+    const [startDate, setStartDate] = useState(filters.start_date || '');
+    const [endDate, setEndDate] = useState(filters.end_date || '');
+    const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; submission: Submission | null }>({ isOpen: false, submission: null });
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -70,6 +78,8 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
             search,
             qc_type: qcType,
             status,
+            start_date: startDate,
+            end_date: endDate,
         }, {
             preserveState: true,
             replace: true,
@@ -80,7 +90,47 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
         setSearch('');
         setQcType('');
         setStatus('');
+        setStartDate('');
+        setEndDate('');
         router.get(route('qc.index'));
+    };
+
+    const handleExport = () => {
+        const params = new URLSearchParams({
+            search,
+            qc_type: qcType,
+            status,
+            start_date: startDate,
+            end_date: endDate,
+        });
+        window.location.href = route('qc.export') + '?' + params.toString();
+    };
+
+    const handleExportPdf = () => {
+        const params = new URLSearchParams({
+            search,
+            qc_type: qcType,
+            status,
+            start_date: startDate,
+            end_date: endDate,
+        });
+        window.location.href = route('qc.export.pdf') + '?' + params.toString();
+    };
+
+    const handleDeleteClick = (submission: Submission) => {
+        setConfirmDelete({ isOpen: true, submission });
+    };
+
+    const executeDelete = () => {
+        if (!confirmDelete.submission) return;
+
+        setIsDeleting(true);
+        router.delete(route('qc.destroy', confirmDelete.submission.id), {
+            onFinish: () => {
+                setIsDeleting(false);
+                setConfirmDelete({ isOpen: false, submission: null });
+            },
+        });
     };
 
     const getStatusConfig = (status: string) => {
@@ -128,10 +178,10 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
 
                 {/* Filters */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-                    <form onSubmit={handleSearch} className="flex flex-col gap-4">
+                    <form onSubmit={handleSearch} className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             {/* Search */}
-                            <div className="relative">
+                            <div className="md:col-span-2 relative">
                                 <Search className="absolute left-3 top-2.5 size-4 text-slate-400" />
                                 <input
                                     type="text"
@@ -142,14 +192,14 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                                 />
                             </div>
 
-                            {/* Tipe QC */}
+                            {/* Interval QC */}
                             <div>
                                 <select
                                     value={qcType}
                                     onChange={(e) => setQcType(e.target.value)}
                                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
                                 >
-                                    <option value="">Semua Periode QC</option>
+                                    <option value="">Semua Interval QC</option>
                                     <option value="harian">Harian</option>
                                     <option value="bulanan">Bulanan</option>
                                     <option value="tahunan">Tahunan</option>
@@ -165,23 +215,63 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                                 >
                                     <option value="">Semua Status</option>
                                     <option value="draft">Draf (Belum Selesai)</option>
-                                    <option value="submitted">Tercatat</option>
-                                    <option value="needs_action">Perlu Tindakan (Ada Peringatan)</option>
+                                    <option value="submitted">Tercatat (Normal)</option>
+                                    <option value="needs_action">Perlu Tindak Lanjut (Peringatan)</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800/50">
+                            {/* Start Date */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500 whitespace-nowrap">Mulai:</span>
+                                <input
+                                    type="date"
+                                    value={startDate}
+                                    onChange={(e) => setStartDate(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                                />
+                            </div>
+
+                            {/* End Date */}
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500 whitespace-nowrap">Selesai:</span>
+                                <input
+                                    type="date"
+                                    value={endDate}
+                                    onChange={(e) => setEndDate(e.target.value)}
+                                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                                />
                             </div>
 
                             {/* Actions */}
-                            <div className="flex gap-2">
-                                <Button type="submit" className="flex-1 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white">
+                            <div className="md:col-span-2 flex gap-2">
+                                <Button type="submit" className="flex-1 bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-semibold">
                                     Cari
                                 </Button>
                                 <Button 
                                     type="button" 
                                     variant="outline" 
                                     onClick={resetFilters}
-                                    className="px-3 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                    className="px-3 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold"
                                 >
                                     Reset
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleExport}
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 text-xs"
+                                >
+                                    <FileSpreadsheet className="size-4 shrink-0" />
+                                    Ekspor Excel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    onClick={handleExportPdf}
+                                    className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-rose-500/10 text-xs"
+                                >
+                                    <FileText className="size-4 shrink-0" />
+                                    Ekspor PDF
                                 </Button>
                             </div>
                         </div>
@@ -197,7 +287,7 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                                     <tr className="bg-slate-50 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800">
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tanggal</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Peralatan Medis</th>
-                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tipe QC</th>
+                                        <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Interval QC</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pengisi</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Peringatan</th>
@@ -277,11 +367,7 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                                                                     variant="outline" 
                                                                     size="icon" 
                                                                     className="size-7 border-slate-200 dark:border-slate-800 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20"
-                                                                    onClick={() => {
-                                                                        if (confirm('Apakah Anda yakin ingin menghapus data QC ini?')) {
-                                                                            router.delete(route('qc.destroy', sub.id));
-                                                                        }
-                                                                    }}
+                                                                    onClick={() => handleDeleteClick(sub)}
                                                                 >
                                                                     <Trash2 className="size-3" />
                                                                 </Button>
@@ -336,6 +422,17 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                     )}
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={confirmDelete.isOpen}
+                onClose={() => setConfirmDelete({ isOpen: false, submission: null })}
+                onConfirm={executeDelete}
+                title="Hapus Riwayat QC"
+                message={`Hapus data QC "${confirmDelete.submission?.equipment_unit.name}"?\n\nSemua jawaban pada pemeriksaan ini akan ikut dihapus.`}
+                confirmText="Hapus Riwayat"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </AuthenticatedLayout>
     );
 }

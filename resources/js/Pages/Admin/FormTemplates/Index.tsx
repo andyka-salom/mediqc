@@ -2,14 +2,12 @@ import React, { useState } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import {
-    Search,
     Edit,
     Trash2,
     X,
     Plus,
     FileText,
     Send,
-    Eye,
     Calendar,
     Tag,
     CheckCircle,
@@ -17,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 // ────────────── Types ──────────────
 
@@ -74,6 +73,10 @@ const qcTypeConfig: Record<string, { label: string; bg: string; text: string }> 
 
 export default function Index({ templates, equipmentTypes, roles }: IndexProps) {
     const [createModalOpen, setCreateModalOpen] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState<{isOpen: boolean; template: FormTemplate | null}>({isOpen: false, template: null});
+    const [confirmPublish, setConfirmPublish] = useState<{isOpen: boolean; template: FormTemplate | null}>({isOpen: false, template: null});
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
 
     const createForm = useForm({
         equipment_type_id: '',
@@ -102,15 +105,35 @@ export default function Index({ templates, equipmentTypes, roles }: IndexProps) 
         });
     };
 
-    const handleDelete = (t: FormTemplate) => {
-        if (confirm(`Apakah Anda yakin ingin menghapus template "${t.name}" (v${t.version})?`)) {
-            router.delete(route('admin.templates.destroy', t.id));
+    const handleDeleteClick = (t: FormTemplate) => {
+        setConfirmDelete({ isOpen: true, template: t });
+    };
+
+    const executeDelete = () => {
+        if (confirmDelete.template) {
+            setIsDeleting(true);
+            router.delete(route('admin.templates.destroy', confirmDelete.template.id), {
+                onFinish: () => {
+                    setIsDeleting(false);
+                    setConfirmDelete({ isOpen: false, template: null });
+                },
+            });
         }
     };
 
-    const handlePublish = (t: FormTemplate) => {
-        if (confirm(`Publikasikan template "${t.name}" (v${t.version})?\n\nTemplate lain dengan tipe QC & alat yang sama akan di-nonaktifkan.`)) {
-            router.post(route('admin.templates.publish', t.id));
+    const handlePublishClick = (t: FormTemplate) => {
+        setConfirmPublish({ isOpen: true, template: t });
+    };
+
+    const executePublish = () => {
+        if (confirmPublish.template) {
+            setIsPublishing(true);
+            router.post(route('admin.templates.publish', confirmPublish.template.id), {}, {
+                onFinish: () => {
+                    setIsPublishing(false);
+                    setConfirmPublish({ isOpen: false, template: null });
+                },
+            });
         }
     };
 
@@ -229,13 +252,13 @@ export default function Index({ templates, equipmentTypes, roles }: IndexProps) 
                                         </Link>
                                         <div className="flex gap-1.5">
                                             {!t.is_published && (
-                                                <Button onClick={() => handlePublish(t)} variant="outline" size="sm"
+                                                <Button onClick={() => handlePublishClick(t)} variant="outline" size="sm"
                                                     className="h-7 text-xs border-emerald-200 dark:border-emerald-900 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 gap-1">
                                                     <Send className="size-3" />
                                                     Publish
                                                 </Button>
                                             )}
-                                            <Button onClick={() => handleDelete(t)} variant="outline" size="icon"
+                                            <Button onClick={() => handleDeleteClick(t)} variant="outline" size="icon"
                                                 className="size-7 border-slate-200 dark:border-slate-800 text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20">
                                                 <Trash2 className="size-3" />
                                             </Button>
@@ -356,6 +379,29 @@ export default function Index({ templates, equipmentTypes, roles }: IndexProps) 
                     </div>
                 </div>
             )}
+
+            {/* Confirm Modals */}
+            <ConfirmModal
+                isOpen={confirmDelete.isOpen}
+                onClose={() => setConfirmDelete({ isOpen: false, template: null })}
+                onConfirm={executeDelete}
+                title="Hapus Template"
+                message={`Apakah Anda yakin ingin menghapus template "${confirmDelete.template?.name}" (v${confirmDelete.template?.version})? Tindakan ini tidak dapat dibatalkan.`}
+                confirmText="Hapus"
+                variant="danger"
+                isLoading={isDeleting}
+            />
+
+            <ConfirmModal
+                isOpen={confirmPublish.isOpen}
+                onClose={() => setConfirmPublish({ isOpen: false, template: null })}
+                onConfirm={executePublish}
+                title="Publikasikan Template"
+                message={`Publikasikan template "${confirmPublish.template?.name}" (v${confirmPublish.template?.version})?\n\nTemplate lain dengan tipe QC & alat yang sama akan di-nonaktifkan.`}
+                confirmText="Publikasikan"
+                variant="info"
+                isLoading={isPublishing}
+            />
         </AuthenticatedLayout>
     );
 }

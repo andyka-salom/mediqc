@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 // ────────────── Types ──────────────
 
@@ -42,8 +43,24 @@ interface EquipmentUnit {
     tanggal_kalibrasi_berikutnya: string | null;
     status: 'aktif' | 'maintenance' | 'rusak' | 'dihapus';
     catatan: string | null;
+    qc_schedule_config: QcScheduleConfig | null;
     is_active: boolean;
     equipment_type: EquipmentType | null;
+}
+
+interface QcScheduleConfig {
+    harian: {
+        enabled: boolean;
+        interval_days: number;
+    };
+    bulanan: {
+        enabled: boolean;
+        interval_months: number;
+    };
+    tahunan: {
+        enabled: boolean;
+        interval_months: number;
+    };
 }
 
 interface PaginatedData<T> {
@@ -75,6 +92,38 @@ const statusConfig: Record<string, { label: string; bg: string; text: string }> 
     dihapus: { label: 'Dihapus', bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-500 dark:text-slate-400' },
 };
 
+const defaultQcScheduleConfig: QcScheduleConfig = {
+    harian: { enabled: true, interval_days: 1 },
+    bulanan: { enabled: true, interval_months: 1 },
+    tahunan: { enabled: true, interval_months: 12 },
+};
+
+const normalizeQcScheduleConfig = (config: QcScheduleConfig | null | undefined): QcScheduleConfig => ({
+    harian: {
+        enabled: config?.harian?.enabled ?? true,
+        interval_days: config?.harian?.interval_days ?? 1,
+    },
+    bulanan: {
+        enabled: config?.bulanan?.enabled ?? true,
+        interval_months: config?.bulanan?.interval_months ?? 1,
+    },
+    tahunan: {
+        enabled: config?.tahunan?.enabled ?? true,
+        interval_months: config?.tahunan?.interval_months ?? 12,
+    },
+});
+
+const qcIntervalSummary = (config: QcScheduleConfig | null | undefined) => {
+    const normalized = normalizeQcScheduleConfig(config);
+    const items = [
+        normalized.harian.enabled ? `Harian/${normalized.harian.interval_days} hari` : null,
+        normalized.bulanan.enabled ? `Bulanan/${normalized.bulanan.interval_months} bln` : null,
+        normalized.tahunan.enabled ? `Tahunan/${normalized.tahunan.interval_months} bln` : null,
+    ].filter(Boolean);
+
+    return items.length > 0 ? items.join(' · ') : 'Tidak ada QC aktif';
+};
+
 // ────────────── Component ──────────────
 
 export default function Index({ units, types, filters }: IndexProps) {
@@ -90,6 +139,12 @@ export default function Index({ units, types, filters }: IndexProps) {
     const [unitModalOpen, setUnitModalOpen] = useState(false);
     const [editingType, setEditingType] = useState<EquipmentType | null>(null);
     const [editingUnit, setEditingUnit] = useState<EquipmentUnit | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<{
+        isOpen: boolean;
+        kind: 'type' | 'unit' | null;
+        item: EquipmentType | EquipmentUnit | null;
+    }>({ isOpen: false, kind: null, item: null });
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Forms
     const typeForm = useForm({
@@ -114,6 +169,7 @@ export default function Index({ units, types, filters }: IndexProps) {
         tanggal_kalibrasi_berikutnya: '',
         status: 'aktif',
         catatan: '',
+        qc_schedule_config: defaultQcScheduleConfig,
         is_active: true,
     });
 
@@ -166,9 +222,7 @@ export default function Index({ units, types, filters }: IndexProps) {
     };
 
     const handleDeleteType = (t: EquipmentType) => {
-        if (confirm(`Apakah Anda yakin ingin menghapus tipe "${t.display_name}"?`)) {
-            router.delete(route('admin.equipment.types.destroy', t.id));
-        }
+        setConfirmDelete({ isOpen: true, kind: 'type', item: t });
     };
 
     // ── Unit CRUD ──
@@ -180,6 +234,7 @@ export default function Index({ units, types, filters }: IndexProps) {
             asset_code: '', name: '', merk: '', model: '', serial_number: '',
             ruangan: '', tahun_pengadaan: '', tanggal_kalibrasi_terakhir: '',
             tanggal_kalibrasi_berikutnya: '', status: 'aktif', catatan: '', is_active: true,
+            qc_schedule_config: defaultQcScheduleConfig,
         });
         setUnitModalOpen(true);
     };
@@ -199,6 +254,7 @@ export default function Index({ units, types, filters }: IndexProps) {
             tanggal_kalibrasi_berikutnya: u.tanggal_kalibrasi_berikutnya ? u.tanggal_kalibrasi_berikutnya.substring(0, 10) : '',
             status: u.status,
             catatan: u.catatan || '',
+            qc_schedule_config: normalizeQcScheduleConfig(u.qc_schedule_config),
             is_active: u.is_active,
         });
         setUnitModalOpen(true);
@@ -213,10 +269,34 @@ export default function Index({ units, types, filters }: IndexProps) {
         }
     };
 
+    const updateUnitQcSchedule = (qcType: keyof QcScheduleConfig, key: string, value: boolean | number) => {
+        unitForm.setData('qc_schedule_config', {
+            ...unitForm.data.qc_schedule_config,
+            [qcType]: {
+                ...unitForm.data.qc_schedule_config[qcType],
+                [key]: value,
+            },
+        });
+    };
+
     const handleDeleteUnit = (u: EquipmentUnit) => {
-        if (confirm(`Apakah Anda yakin ingin menghapus unit "${u.name}"?`)) {
-            router.delete(route('admin.equipment.units.destroy', u.id));
-        }
+        setConfirmDelete({ isOpen: true, kind: 'unit', item: u });
+    };
+
+    const executeDelete = () => {
+        if (!confirmDelete.kind || !confirmDelete.item) return;
+
+        setIsDeleting(true);
+        const targetRoute = confirmDelete.kind === 'type'
+            ? route('admin.equipment.types.destroy', confirmDelete.item.id)
+            : route('admin.equipment.units.destroy', confirmDelete.item.id);
+
+        router.delete(targetRoute, {
+            onFinish: () => {
+                setIsDeleting(false);
+                setConfirmDelete({ isOpen: false, kind: null, item: null });
+            },
+        });
     };
 
     // ────────────── Render ──────────────
@@ -347,6 +427,7 @@ export default function Index({ units, types, filters }: IndexProps) {
                                             <th className="px-5 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Ruangan</th>
                                             <th className="px-5 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Status</th>
                                             <th className="px-5 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Kalibrasi</th>
+                                            <th className="px-5 py-3.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Interval QC</th>
                                             <th className="px-5 py-3.5"></th>
                                         </tr>
                                     </thead>
@@ -408,6 +489,11 @@ export default function Index({ units, types, filters }: IndexProps) {
                                                                 <span className="text-[11px] text-slate-400">—</span>
                                                             )}
                                                         </td>
+                                                        <td className="px-5 py-4">
+                                                            <p className="max-w-[180px] text-[11px] leading-5 text-slate-600 dark:text-slate-400">
+                                                                {qcIntervalSummary(unit.qc_schedule_config)}
+                                                            </p>
+                                                        </td>
                                                         <td className="px-5 py-4 text-right">
                                                             <div className="flex justify-end gap-2">
                                                                 <Button onClick={() => openEditUnitModal(unit)} variant="outline" size="icon"
@@ -435,9 +521,12 @@ export default function Index({ units, types, filters }: IndexProps) {
                             </div>
 
                             {/* Pagination */}
-                            {units.last_page > 1 && (
-                                <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                    <span className="text-xs text-slate-500">Menampilkan {units.data.length} dari {units.total} unit</span>
+                            <div className="px-5 py-4 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <span className="text-xs text-slate-500">
+                                    Menampilkan {units.data.length} dari {units.total} unit
+                                    {units.last_page > 1 ? ` · Halaman ${units.current_page} dari ${units.last_page}` : ''}
+                                </span>
+                                {units.last_page > 1 && (
                                     <div className="flex gap-1">
                                         {units.links.map((link, i) => (
                                             <Link key={i} href={link.url || '#'} as="button" disabled={!link.url}
@@ -451,8 +540,8 @@ export default function Index({ units, types, filters }: IndexProps) {
                                             />
                                         ))}
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -583,7 +672,7 @@ export default function Index({ units, types, filters }: IndexProps) {
             {/* ────── Modal: Add/Edit Equipment Unit ────── */}
             {unitModalOpen && (
                 <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-lg rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                             <h3 className="font-bold text-slate-900 dark:text-white">
                                 {editingUnit ? `Edit Unit: ${editingUnit.name}` : 'Tambah Unit Alat Medis'}
@@ -673,6 +762,90 @@ export default function Index({ units, types, filters }: IndexProps) {
                                     </div>
                                 </div>
 
+                                {/* QC Schedule */}
+                                <div className="space-y-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 p-4">
+                                    <div>
+                                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200">Interval Jadwal QC</p>
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500">Atur frekuensi QC khusus untuk unit ini.</p>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2">
+                                            <label className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Harian</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={unitForm.data.qc_schedule_config.harian.enabled}
+                                                    onChange={e => updateUnitQcSchedule('harian', 'enabled', e.target.checked)}
+                                                    className="size-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                                                />
+                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-500">Setiap</span>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={365}
+                                                    value={unitForm.data.qc_schedule_config.harian.interval_days}
+                                                    onChange={e => updateUnitQcSchedule('harian', 'interval_days', parseInt(e.target.value) || 1)}
+                                                    className="w-16 px-2 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-xs outline-none focus:border-indigo-500"
+                                                />
+                                                <span className="text-[10px] text-slate-500">hari</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2">
+                                            <label className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Bulanan</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={unitForm.data.qc_schedule_config.bulanan.enabled}
+                                                    onChange={e => updateUnitQcSchedule('bulanan', 'enabled', e.target.checked)}
+                                                    className="size-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                                                />
+                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-500">Setiap</span>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={24}
+                                                    value={unitForm.data.qc_schedule_config.bulanan.interval_months}
+                                                    onChange={e => updateUnitQcSchedule('bulanan', 'interval_months', parseInt(e.target.value) || 1)}
+                                                    className="w-16 px-2 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-xs outline-none focus:border-indigo-500"
+                                                />
+                                                <span className="text-[10px] text-slate-500">bulan</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2">
+                                            <label className="flex items-center justify-between gap-2">
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Tahunan</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={unitForm.data.qc_schedule_config.tahunan.enabled}
+                                                    onChange={e => updateUnitQcSchedule('tahunan', 'enabled', e.target.checked)}
+                                                    className="size-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded cursor-pointer"
+                                                />
+                                            </label>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-slate-500">Setiap</span>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={120}
+                                                    value={unitForm.data.qc_schedule_config.tahunan.interval_months}
+                                                    onChange={e => updateUnitQcSchedule('tahunan', 'interval_months', parseInt(e.target.value) || 12)}
+                                                    className="w-16 px-2 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-xs outline-none focus:border-indigo-500"
+                                                />
+                                                <span className="text-[10px] text-slate-500">bulan</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {unitForm.errors.qc_schedule_config && <p className="text-rose-500 text-[10px] font-bold">{unitForm.errors.qc_schedule_config}</p>}
+                                </div>
+
                                 {/* Status */}
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Status</label>
@@ -713,6 +886,21 @@ export default function Index({ units, types, filters }: IndexProps) {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirmDelete.isOpen}
+                onClose={() => setConfirmDelete({ isOpen: false, kind: null, item: null })}
+                onConfirm={executeDelete}
+                title={confirmDelete.kind === 'type' ? 'Hapus Tipe Alat' : 'Hapus Unit Alat'}
+                message={
+                    confirmDelete.kind === 'type'
+                        ? `Hapus tipe "${(confirmDelete.item as EquipmentType | null)?.display_name}"?\n\nTipe yang masih memiliki unit tidak dapat dihapus.`
+                        : `Hapus unit "${(confirmDelete.item as EquipmentUnit | null)?.name}"?\n\nRiwayat unit ini akan mengikuti aturan penghapusan dari server.`
+                }
+                confirmText={confirmDelete.kind === 'type' ? 'Hapus Tipe' : 'Hapus Unit'}
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </AuthenticatedLayout>
     );
 }

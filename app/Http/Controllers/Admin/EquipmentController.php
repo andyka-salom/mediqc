@@ -117,8 +117,17 @@ class EquipmentController extends Controller
             'tanggal_kalibrasi_berikutnya' => 'nullable|date',
             'status' => 'required|string|in:aktif,maintenance,rusak,dihapus',
             'catatan' => 'nullable|string',
+            'qc_schedule_config' => 'required|array',
+            'qc_schedule_config.harian.enabled' => 'required|boolean',
+            'qc_schedule_config.harian.interval_days' => 'required|integer|min:1|max:365',
+            'qc_schedule_config.bulanan.enabled' => 'required|boolean',
+            'qc_schedule_config.bulanan.interval_months' => 'required|integer|min:1|max:24',
+            'qc_schedule_config.tahunan.enabled' => 'required|boolean',
+            'qc_schedule_config.tahunan.interval_months' => 'required|integer|min:1|max:120',
             'is_active' => 'required|boolean',
         ]);
+
+        $validated['qc_schedule_config'] = $this->normalizeQcScheduleConfig($validated['qc_schedule_config']);
 
         EquipmentUnit::create($validated);
 
@@ -146,8 +155,17 @@ class EquipmentController extends Controller
             'tanggal_kalibrasi_berikutnya' => 'nullable|date',
             'status' => 'required|string|in:aktif,maintenance,rusak,dihapus',
             'catatan' => 'nullable|string',
+            'qc_schedule_config' => 'required|array',
+            'qc_schedule_config.harian.enabled' => 'required|boolean',
+            'qc_schedule_config.harian.interval_days' => 'required|integer|min:1|max:365',
+            'qc_schedule_config.bulanan.enabled' => 'required|boolean',
+            'qc_schedule_config.bulanan.interval_months' => 'required|integer|min:1|max:24',
+            'qc_schedule_config.tahunan.enabled' => 'required|boolean',
+            'qc_schedule_config.tahunan.interval_months' => 'required|integer|min:1|max:120',
             'is_active' => 'required|boolean',
         ]);
+
+        $validated['qc_schedule_config'] = $this->normalizeQcScheduleConfig($validated['qc_schedule_config']);
 
         $unit->update($validated);
 
@@ -171,5 +189,23 @@ class EquipmentController extends Controller
 
         return redirect()->route('admin.equipment.index')
             ->with('success', 'Unit Alat Medis berhasil dihapus secara permanen.');
+    }
+
+    private function normalizeQcScheduleConfig(array $config): array
+    {
+        return [
+            'harian' => [
+                'enabled' => (bool) data_get($config, 'harian.enabled', true),
+                'interval_days' => max(1, (int) data_get($config, 'harian.interval_days', 1)),
+            ],
+            'bulanan' => [
+                'enabled' => (bool) data_get($config, 'bulanan.enabled', true),
+                'interval_months' => max(1, (int) data_get($config, 'bulanan.interval_months', 1)),
+            ],
+            'tahunan' => [
+                'enabled' => (bool) data_get($config, 'tahunan.enabled', true),
+                'interval_months' => max(1, (int) data_get($config, 'tahunan.interval_months', 12)),
+            ],
+        ];
     }
 }

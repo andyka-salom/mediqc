@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
 
 interface ConfirmModalProps {
     isOpen: boolean;
@@ -27,15 +26,24 @@ export function ConfirmModal({
     isLoading = false
 }: ConfirmModalProps) {
     useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape' && isOpen && !isLoading) {
+                onClose();
+            }
+        };
+
         if (isOpen) {
             document.body.style.overflow = 'hidden';
+            window.addEventListener('keydown', handleKeyDown);
         } else {
             document.body.style.overflow = 'unset';
         }
+
         return () => {
             document.body.style.overflow = 'unset';
+            window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [isOpen]);
+    }, [isOpen, isLoading, onClose]);
 
     if (!isOpen) return null;
 
@@ -69,18 +77,24 @@ export function ConfirmModal({
             />
 
             {/* Modal Panel */}
-            <div className="relative transform overflow-hidden rounded-2xl bg-white dark:bg-slate-900 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg animate-in fade-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+            <div
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="confirm-modal-title"
+                aria-describedby="confirm-modal-description"
+                className="relative transform overflow-hidden rounded-2xl bg-white dark:bg-slate-900 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg animate-in fade-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800"
+            >
                 <div className="bg-white dark:bg-slate-900 px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
                     <div className="sm:flex sm:items-start">
                         <div className={cn("mx-auto flex size-12 shrink-0 items-center justify-center rounded-full sm:mx-0 sm:size-10", currentVariant.iconBg)}>
                             {currentVariant.icon}
                         </div>
                         <div className="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left">
-                            <h3 className="text-lg font-bold leading-6 text-slate-900 dark:text-white">
+                            <h3 id="confirm-modal-title" className="text-lg font-bold leading-6 text-slate-900 dark:text-white">
                                 {title}
                             </h3>
                             <div className="mt-2">
-                                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+                                <p id="confirm-modal-description" className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-line">
                                     {message}
                                 </p>
                             </div>
@@ -113,6 +127,8 @@ export function ConfirmModal({
                 <button 
                     onClick={() => !isLoading && onClose()}
                     className="absolute right-4 top-4 text-slate-400 hover:text-slate-500 dark:hover:text-slate-300"
+                    aria-label="Tutup modal konfirmasi"
+                    type="button"
                 >
                     <X className="size-5" />
                 </button>

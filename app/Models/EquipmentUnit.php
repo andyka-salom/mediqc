@@ -24,6 +24,7 @@ class EquipmentUnit extends Model
         'tanggal_kalibrasi_berikutnya',
         'status',
         'catatan',
+        'qc_schedule_config',
         'is_active',
     ];
 
@@ -31,8 +32,49 @@ class EquipmentUnit extends Model
         'tahun_pengadaan'              => 'date',
         'tanggal_kalibrasi_terakhir'   => 'date',
         'tanggal_kalibrasi_berikutnya' => 'date',
+        'qc_schedule_config'            => 'array',
         'is_active'                    => 'boolean',
     ];
+
+    public const DEFAULT_QC_SCHEDULE_CONFIG = [
+        'harian' => [
+            'enabled' => true,
+            'interval_days' => 1,
+        ],
+        'bulanan' => [
+            'enabled' => true,
+            'interval_months' => 1,
+        ],
+        'tahunan' => [
+            'enabled' => true,
+            'interval_months' => 12,
+        ],
+    ];
+
+    public function qcScheduleConfig(): array
+    {
+        return array_replace_recursive(
+            self::DEFAULT_QC_SCHEDULE_CONFIG,
+            $this->qc_schedule_config ?? []
+        );
+    }
+
+    public function qcTypeEnabled(string $qcType): bool
+    {
+        return (bool) ($this->qcScheduleConfig()[$qcType]['enabled'] ?? false);
+    }
+
+    public function qcIntervalValue(string $qcType): int
+    {
+        $config = $this->qcScheduleConfig()[$qcType] ?? [];
+
+        return match ($qcType) {
+            'harian' => max(1, (int) ($config['interval_days'] ?? 1)),
+            'bulanan' => max(1, (int) ($config['interval_months'] ?? 1)),
+            'tahunan' => max(1, (int) ($config['interval_months'] ?? 12)),
+            default => 1,
+        };
+    }
 
     public function equipmentType(): BelongsTo
     {

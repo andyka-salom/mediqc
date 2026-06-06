@@ -61,6 +61,25 @@ class HandleInertiaRequests extends Middleware
                 'success' => $request->session()->get('success'),
                 'error' => $request->session()->get('error'),
             ],
+            'calibrationWarnings' => function () use ($user) {
+                if ($user && ($user->role?->name === 'admin' || !empty($user->role?->permissions['equipment.manage']))) {
+                    return \App\Models\EquipmentUnit::where('status', 'aktif')
+                        ->whereNotNull('tanggal_kalibrasi_berikutnya')
+                        ->where('tanggal_kalibrasi_berikutnya', '<=', now()->addDays(30))
+                        ->orderBy('tanggal_kalibrasi_berikutnya')
+                        ->get(['id', 'name', 'asset_code', 'tanggal_kalibrasi_berikutnya'])
+                        ->map(function ($unit) {
+                            return [
+                                'id' => $unit->id,
+                                'name' => $unit->name,
+                                'asset_code' => $unit->asset_code,
+                                'due_date' => $unit->tanggal_kalibrasi_berikutnya->format('d/m/Y'),
+                                'is_overdue' => $unit->tanggal_kalibrasi_berikutnya->isPast(),
+                            ];
+                        });
+                }
+                return [];
+            },
         ];
     }
 }

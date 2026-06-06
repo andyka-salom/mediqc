@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 
 interface Role {
     id: number;
@@ -60,6 +61,8 @@ export default function Index({ users, roles, filters }: IndexProps) {
     const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [selectedRole, setSelectedRole] = useState<Role | null>(null);
+    const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; user: User | null }>({ isOpen: false, user: null });
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Form for User CRUD
     const userForm = useForm({
@@ -138,9 +141,19 @@ export default function Index({ users, roles, filters }: IndexProps) {
     };
 
     const handleDeleteUser = (user: User) => {
-        if (confirm(`Apakah Anda yakin ingin menghapus user ${user.name}?`)) {
-            router.delete(route('admin.users.destroy', user.id));
-        }
+        setConfirmDelete({ isOpen: true, user });
+    };
+
+    const executeDeleteUser = () => {
+        if (!confirmDelete.user) return;
+
+        setIsDeleting(true);
+        router.delete(route('admin.users.destroy', confirmDelete.user.id), {
+            onFinish: () => {
+                setIsDeleting(false);
+                setConfirmDelete({ isOpen: false, user: null });
+            },
+        });
     };
 
     const openPermissionsModal = (role: Role) => {
@@ -157,6 +170,7 @@ export default function Index({ users, roles, filters }: IndexProps) {
             [key]: value,
         });
     };
+
 
     const handleQcSubmitToggle = (type: string, isChecked: boolean) => {
         const currentSubmit = permissionsForm.data.permissions['qc.submit'];
@@ -579,19 +593,14 @@ export default function Index({ users, roles, filters }: IndexProps) {
                                         })}
                                     </div>
                                 </div>
-
-                                {/* Toggle switches for single permissions */}
+                                {/* Toggle switches for admin permissions */}
                                 <div className="space-y-4">
-                                    <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-widest">Daftar Hak Akses Sistem</h4>
+                                    <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-550 uppercase tracking-widest">Akses Manajemen Administrasi</h4>
                                     
                                     {[
-                                        { key: 'qc.view_own', title: 'Melihat Hasil QC Sendiri', desc: 'Membuka riwayat berkas QC yang dibuat sendiri oleh user ini.' },
-                                        { key: 'qc.view_all', title: 'Melihat Seluruh Hasil QC (Global)', desc: 'Melihat riwayat QC dari seluruh user/unit alat medis di RS.' },
                                         { key: 'template.manage', title: 'Manajemen Template Formulir', desc: 'Membuat, mengubah struktur field, mempublikasikan, dan menghapus template form.' },
                                         { key: 'equipment.manage', title: 'Manajemen Peralatan Medis', desc: 'Mengelola unit dan tipe peralatan medis fisik beserta status kalibrasi.' },
                                         { key: 'user.manage', title: 'Manajemen Pengguna & Izin Akses', desc: 'Mengelola data kredensial pegawai, aktif/non-aktif akun, dan peran.' },
-                                        { key: 'report.view', title: 'Melihat Laporan Statistik', desc: 'Membuka dan mengunduh laporan bulanan serta grafik kepatuhan QC.' },
-                                        { key: 'audit.view', title: 'Melihat Log Audit Sistem', desc: 'Melihat rekaman aktivitas log sistem dari tindakan user lain.' },
                                     ].map(item => {
                                         const isGranted = !!permissionsForm.data.permissions[item.key];
                                         return (
@@ -610,6 +619,7 @@ export default function Index({ users, roles, filters }: IndexProps) {
                                         );
                                     })}
                                 </div>
+
                             </div>
                             <div className="px-6 py-4 bg-slate-50 dark:bg-slate-955 border-t border-slate-150 dark:border-slate-800 flex justify-end gap-2">
                                 <Button 
@@ -632,6 +642,17 @@ export default function Index({ users, roles, filters }: IndexProps) {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={confirmDelete.isOpen}
+                onClose={() => setConfirmDelete({ isOpen: false, user: null })}
+                onConfirm={executeDeleteUser}
+                title="Hapus Pengguna"
+                message={`Hapus pengguna "${confirmDelete.user?.name}"?\n\nAkun ini tidak akan bisa digunakan lagi setelah dihapus.`}
+                confirmText="Hapus Pengguna"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </AuthenticatedLayout>
     );
 }

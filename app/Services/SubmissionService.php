@@ -203,22 +203,4 @@ class SubmissionService
             ? SubmissionStatus::NEEDS_ACTION->value
             : SubmissionStatus::SUBMITTED->value;
     }
-
-    public function review(QcSubmission $submission, User $reviewer, bool $approved, ?string $notes = null): QcSubmission
-    {
-        $submission->update([
-            'reviewed_by'    => $reviewer->id,
-            'reviewed_at'    => now(),
-            'review_notes'   => $notes,
-            'overall_status' => $approved
-                ? SubmissionStatus::APPROVED->value
-                : SubmissionStatus::REJECTED->value,
-        ]);
-
-        AuditLog::record($approved ? 'approved' : 'rejected', $submission, [
-            'reviewer' => $reviewer->name,
-        ]);
-
-        return $submission->fresh();
-    }
 }

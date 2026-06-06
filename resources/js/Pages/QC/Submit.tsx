@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { 
@@ -9,7 +9,10 @@ import {
     Send, 
     Info, 
     Building, 
-    FileText
+    FileText,
+    X,
+    Plus,
+    Search
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -56,6 +59,7 @@ interface FormSection {
     title: string;
     description: string | null;
     order_index: number;
+    hidden_by_default?: boolean;
     fields: FormField[];
 }
 
@@ -113,6 +117,53 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
         submit: false,
     });
 
+    // Track active status for optional sections (hidden by default)
+    const [activeOptionalSections, setActiveOptionalSections] = useState<Record<number, boolean>>(() => {
+        const initial: Record<number, boolean> = {};
+        template.sections.forEach(section => {
+            if (section.hidden_by_default) {
+                initial[section.id] = false;
+            } else {
+                initial[section.id] = true;
+            }
+        });
+        return initial;
+    });
+
+    const [optionalSearch, setOptionalSearch] = useState('');
+
+    const handleRemoveOptionalSection = (sectionId: number) => {
+        setActiveOptionalSections(prev => ({
+            ...prev,
+            [sectionId]: false
+        }));
+        
+        // Reset answer values for all fields in this section
+        const section = template.sections.find(s => s.id === sectionId);
+        if (section) {
+            const nextAnswers = { ...data.answers };
+            section.fields.forEach(field => {
+                let resetVal: any = '';
+                if (field.field_type === 'boolean' || field.field_type === 'pass_fail') {
+                    resetVal = null;
+                } else if (field.field_type === 'range_slider') {
+                    resetVal = field.config?.min ?? 0;
+                } else if (field.field_type === 'multiselect' || field.field_type === 'checkbox_group' || field.field_type === 'table') {
+                    resetVal = [];
+                }
+                nextAnswers[field.id] = resetVal;
+            });
+            setData('answers', nextAnswers);
+        }
+    };
+
+    const handleAddOptionalSection = (sectionId: number) => {
+        setActiveOptionalSections(prev => ({
+            ...prev,
+            [sectionId]: true
+        }));
+    };
+
     const handleAnswerChange = (fieldId: number, val: any) => {
         setData('answers', {
             ...data.answers,
@@ -167,6 +218,9 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
     const allFields = template.sections.flatMap(s => s.fields);
 
     const shouldShowField = (field: FormField): boolean => {
+        if (!activeOptionalSections[field.form_section_id]) {
+            return false;
+        }
         if (!field.parent_field_id) {
             return true;
         }
@@ -686,11 +740,13 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                     ? "bg-amber-500/[0.02] border-amber-500/30 shadow-xs" 
                     : "bg-transparent border-transparent"
             )}>
-                <label className="flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                    {field.label}
-                    {field.is_required && (
-                        <span className="text-rose-500" title="Wajib diisi">*</span>
-                    )}
+                <label className="flex items-center justify-between gap-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                    <span className="flex items-center gap-1.5">
+                        {field.label}
+                        {field.is_required && (
+                            <span className="text-rose-500" title="Wajib diisi">*</span>
+                        )}
+                    </span>
                 </label>
 
                 {renderInputField(field)}
@@ -763,7 +819,7 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
         <AuthenticatedLayout>
             <Head title={`Form QC: ${template.name}`} />
 
-            <div className="space-y-6 max-w-4xl mx-auto pb-20">
+            <div className="space-y-6 max-w-7xl mx-auto pb-20 px-4 md:px-6">
                 {/* Header Back & Info */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1">
@@ -828,73 +884,165 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                     </div>
                 )}
 
-                {/* Form Sections */}
-                <div className="space-y-6">
-                    {template.sections.map((section) => (
-                        <div 
-                            key={section.id}
-                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs"
-                        >
-                            {/* Section Header */}
-                            <div className="px-6 py-4 bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800">
-                                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{section.title}</h3>
-                                {section.description && (
-                                    <p className="text-xs text-slate-500 mt-0.5">{section.description}</p>
-                                )}
-                            </div>
+                {/* Main Content Grid */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* Left Panel: Form Sections and Actions */}
+                    <div className="lg:col-span-8 space-y-6 order-2 lg:order-1">
+                        {/* Form Sections */}
+                        <div className="space-y-6">
+                            {template.sections.map((section) => {
+                                const hasVisibleFields = section.fields.some(shouldShowField);
+                                if (!hasVisibleFields) return null;
 
-                            {/* Section Fields */}
-                            <div className="p-6 space-y-4">
-                                {renderFields(section.fields)}
+                                return (
+                                    <div 
+                                        key={section.id}
+                                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs animate-in fade-in duration-300"
+                                    >
+                                        {/* Section Header */}
+                                        <div className="px-6 py-4 bg-slate-50/50 dark:bg-slate-955 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
+                                            <div>
+                                                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{section.title}</h3>
+                                                {section.description && (
+                                                    <p className="text-xs text-slate-500 mt-0.5">{section.description}</p>
+                                                )}
+                                            </div>
+                                            {section.hidden_by_default && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveOptionalSection(section.id)}
+                                                    className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 p-1.5 rounded transition-colors cursor-pointer shrink-0"
+                                                    title="Sembunyikan seksi ini"
+                                                >
+                                                    <X className="size-4" />
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Section Fields */}
+                                        <div className="p-6 space-y-4">
+                                            {renderFields(section.fields)}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Catatan Masalah / Tambahan */}
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-3 shadow-xs">
+                            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">Catatan Masalah Tambahan (Opsional)</label>
+                            <textarea
+                                value={data.catatan_masalah}
+                                onChange={e => setData('catatan_masalah', e.target.value)}
+                                placeholder="Masukkan catatan kendala fisik alat medis jika ada..."
+                                rows={3}
+                                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                            />
+                        </div>
+
+                        {/* Form Actions */}
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+                            <div className="text-xs text-slate-400 dark:text-slate-500 text-center sm:text-left">
+                                Pastikan semua parameter terisi dengan benar sebelum diajukan.
+                            </div>
+                            
+                            <div className="flex gap-3 w-full sm:w-auto">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    disabled={processing}
+                                    onClick={() => handleSubmit(false)}
+                                    className="flex-1 sm:flex-initial flex items-center justify-center gap-2 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 font-semibold cursor-pointer"
+                                >
+                                    <Save className="size-4" />
+                                    Simpan Draft
+                                </Button>
+
+                                <Button
+                                    type="button"
+                                    disabled={processing}
+                                    onClick={() => handleSubmit(true)}
+                                    className={cn(
+                                        "flex-1 sm:flex-initial flex items-center justify-center gap-2 text-white font-semibold cursor-pointer",
+                                        activeWarningsCount > 0 
+                                            ? "bg-amber-600 hover:bg-amber-500" 
+                                            : "bg-indigo-600 hover:bg-indigo-500"
+                                    )}
+                                >
+                                    <Send className="size-4" />
+                                    {activeWarningsCount > 0 ? 'Ajukan (Needs Action)' : 'Kirim Pemeriksaan'}
+                                </Button>
                             </div>
                         </div>
-                    ))}
-                </div>
-
-                {/* Catatan Masalah / Tambahan */}
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-3 shadow-xs">
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">Catatan Masalah Tambahan (Opsional)</label>
-                    <textarea
-                        value={data.catatan_masalah}
-                        onChange={e => setData('catatan_masalah', e.target.value)}
-                        placeholder="Masukkan catatan kendala fisik alat medis jika ada..."
-                        rows={3}
-                        className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
-                    />
-                </div>
-
-                {/* Form Actions */}
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
-                    <div className="text-xs text-slate-400 dark:text-slate-500 text-center sm:text-left">
-                        Pastikan semua parameter terisi dengan benar sebelum diajukan.
                     </div>
-                    
-                    <div className="flex gap-3 w-full sm:w-auto">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            disabled={processing}
-                            onClick={() => handleSubmit(false)}
-                            className="flex-1 sm:flex-initial flex items-center justify-center gap-2 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900 font-semibold cursor-pointer"
-                        >
-                            <Save className="size-4" />
-                            Simpan Draft
-                        </Button>
 
-                        <Button
-                            type="button"
-                            disabled={processing}
-                            onClick={() => handleSubmit(true)}
-                            className={cn(
-                                "flex-1 sm:flex-initial flex items-center justify-center gap-2 text-white font-semibold cursor-pointer",
-                                activeWarningsCount > 0 
-                                    ? "bg-amber-600 hover:bg-amber-500" 
-                                    : "bg-indigo-600 hover:bg-indigo-500"
-                            )}
-                        >
-                            <Send className="size-4" />
-                            {activeWarningsCount > 0 ? 'Ajukan (Needs Action)' : 'Kirim Pemeriksaan'}
-                        </Button>
+                    {/* Right Panel: Sticky Optional Parameters Card */}
+                    <div className="lg:col-span-4 lg:sticky lg:top-6 space-y-4 order-1 lg:order-2">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
+                            <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Parameter Opsional</h3>
+                                <p className="text-slate-400 dark:text-slate-500 text-[10px] mt-0.5">Daftar parameter tambahan yang dapat ditambahkan.</p>
+                            </div>
+
+                            {/* Search Box */}
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 size-3.5 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Cari parameter..."
+                                    value={optionalSearch}
+                                    onChange={e => setOptionalSearch(e.target.value)}
+                                    className="w-full pl-8 pr-3 py-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/50 transition-all"
+                                />
+                            </div>
+
+                            {/* Available Optional Sections List */}
+                            <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                                {(() => {
+                                    const hiddenSections = template.sections.filter(section => 
+                                        section.hidden_by_default && 
+                                        !activeOptionalSections[section.id] &&
+                                        (optionalSearch ? section.title.toLowerCase().includes(optionalSearch.toLowerCase()) : true)
+                                    );
+
+                                    if (hiddenSections.length === 0) {
+                                        const totalAny = template.sections.some(section => 
+                                            section.hidden_by_default && !activeOptionalSections[section.id]
+                                        );
+
+                                        if (!totalAny) {
+                                            return (
+                                                <div className="text-center py-8 bg-slate-50/50 dark:bg-slate-955 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg">
+                                                    <p className="text-[10px] text-slate-400 font-medium">Semua seksi opsional telah ditambahkan ke form.</p>
+                                                </div>
+                                            );
+                                        }
+
+                                        return (
+                                            <div className="text-center py-8">
+                                                <p className="text-[10px] text-slate-400 font-medium">Tidak ada hasil cocok.</p>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div className="space-y-1.5">
+                                            {hiddenSections.map(section => (
+                                                <button
+                                                    key={section.id}
+                                                    type="button"
+                                                    onClick={() => handleAddOptionalSection(section.id)}
+                                                    className="w-full flex items-center justify-between text-left p-3 bg-slate-50 hover:bg-indigo-50/50 dark:bg-slate-955 dark:hover:bg-indigo-950/20 text-slate-800 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 border border-slate-150 dark:border-slate-850 rounded-lg text-xs font-bold transition-all group cursor-pointer select-none"
+                                                >
+                                                    <span className="truncate pr-2">{section.title}</span>
+                                                    <Plus className="size-3.5 text-slate-450 group-hover:text-indigo-500 shrink-0" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

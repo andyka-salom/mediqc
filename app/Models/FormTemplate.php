@@ -62,6 +62,11 @@ class FormTemplate extends Model
         return $this->hasMany(QcSubmission::class);
     }
 
+    public function schedules(): HasMany
+    {
+        return $this->hasMany(QcSchedule::class);
+    }
+
     public function scopePublished(Builder $q): Builder
     {
         return $q->where('is_published', true)->where('is_active', true);

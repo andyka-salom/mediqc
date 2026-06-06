@@ -1,7 +1,7 @@
 import React from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Lock, Mail, Loader2, ShieldCheck } from 'lucide-react';
+import { Lock, Mail, Loader2 } from 'lucide-react';
 
 declare const route: any;
 
@@ -32,8 +32,9 @@ export default function Login() {
                     
                     {/* Header */}
                     <div className="flex flex-col items-center text-center mb-8">
-                        <div className="size-12 rounded-xl bg-gradient-to-tr from-indigo-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 dark:shadow-indigo-500/30 mb-4 animate-pulse">
-                            <ShieldCheck className="size-6" />
+                        <div className="flex items-center gap-4 mb-6">
+                            <img src="/logo_uner.png" alt="Universitas Airlangga" className="h-14 object-contain" />
+                            <img src="/logo_mediqc.jpeg" alt="MediQC" className="h-14 object-contain rounded-lg" />
                         </div>
                         <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                             Selamat Datang di MediQC
@@ -129,12 +130,6 @@ export default function Login() {
                         </Button>
                     </form>
 
-                    {/* Developer Info */}
-                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/60 text-center">
-                        <span className="text-xs text-slate-550 dark:text-slate-500">
-                            Demo Akun: <code className="text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-950 px-1.5 py-0.5 rounded font-mono">admin@mediqc.local</code> / <code className="text-indigo-600 dark:text-indigo-400 bg-slate-50 dark:bg-slate-950 px-1.5 py-0.5 rounded font-mono">password</code>
-                        </span>
-                    </div>
                 </div>
             </div>
         </>
