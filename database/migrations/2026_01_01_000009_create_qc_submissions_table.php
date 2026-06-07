@@ -45,7 +45,9 @@ return new class extends Migration
             $table->index('period_label');
         });
 
-        DB::statement('ALTER TABLE qc_submissions ALTER COLUMN id SET DEFAULT gen_random_uuid()');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE qc_submissions ALTER COLUMN id SET DEFAULT gen_random_uuid()');
+        }
     }
 
     public function down(): void

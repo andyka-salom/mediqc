@@ -44,7 +44,9 @@ return new class extends Migration
             $table->unique(['submission_id', 'form_field_id'], 'uniq_answer_per_field');
         });
 
-        DB::statement('ALTER TABLE qc_answers ALTER COLUMN id SET DEFAULT gen_random_uuid()');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE qc_answers ALTER COLUMN id SET DEFAULT gen_random_uuid()');
+        }
     }
 
     public function down(): void
