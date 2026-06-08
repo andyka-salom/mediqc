@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 class FormTemplateSeeder extends Seeder
 {
-    private const TEMPLATE_VERSION = 5;
+    private const TEMPLATE_VERSION = 6;
 
     private ?string $adminId = null;
 
@@ -416,14 +416,10 @@ class FormTemplateSeeder extends Seeder
 
             $definition['description'] .= ' Form memuat pertanyaan harian, bulanan, dan tahunan; seksi yang sesuai jadwal tampil otomatis.';
             $definition['sections'] = [
-                $this->sectionForQcType($daily['sections'][0], 'harian', $qcType),
-                $this->sectionForQcType($monthly['sections'][0], 'bulanan', $qcType),
-                $this->sectionForQcType($annual['sections'][0], 'tahunan', $qcType),
-                [
-                    ...$annual['sections'][1],
-                    'title' => 'Parameter Tambahan Tahunan',
-                    'hidden_by_default' => true,
-                ],
+                ...$this->questionSectionsForQcType($daily['sections'][0], 'harian', $qcType),
+                ...$this->questionSectionsForQcType($monthly['sections'][0], 'bulanan', $qcType),
+                ...$this->questionSectionsForQcType($annual['sections'][0], 'tahunan', $qcType),
+                ...$this->questionSectionsForQcType($annual['sections'][1], 'tahunan', $qcType, true),
                 $this->notesSection(),
             ];
 
@@ -431,12 +427,30 @@ class FormTemplateSeeder extends Seeder
         }, $definitions);
     }
 
-    private function sectionForQcType(array $section, string $sectionQcType, string $activeQcType): array
+    private function questionSectionsForQcType(
+        array $section,
+        string $sectionQcType,
+        string $activeQcType,
+        bool $alwaysHidden = false
+    ): array {
+        return array_map(function (array $field) use ($section, $sectionQcType, $activeQcType, $alwaysHidden) {
+            return [
+                'title' => $field['label'],
+                'description' => $this->questionSectionDescription($sectionQcType, $section['description'] ?? null),
+                'hidden_by_default' => $alwaysHidden || $sectionQcType !== $activeQcType,
+                'fields' => [$field],
+            ];
+        }, $section['fields']);
+    }
+
+    private function questionSectionDescription(string $qcType, ?string $fallback): string
     {
-        return [
-            ...$section,
-            'hidden_by_default' => $sectionQcType !== $activeQcType,
-        ];
+        return match ($qcType) {
+            'harian' => 'Pertanyaan QC harian.',
+            'bulanan' => 'Pertanyaan QC bulanan.',
+            'tahunan' => 'Pertanyaan QC tahunan.',
+            default => $fallback ?? 'Pertanyaan QC.',
+        };
     }
 
     private function dailyTemplate(string $equipmentCode, string $displayName, array $checks, array $roles): array
