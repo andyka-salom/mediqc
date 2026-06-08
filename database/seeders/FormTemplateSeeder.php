@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 class FormTemplateSeeder extends Seeder
 {
-    private const TEMPLATE_VERSION = 4;
+    private const TEMPLATE_VERSION = 5;
 
     private ?string $adminId = null;
 
@@ -131,7 +131,7 @@ class FormTemplateSeeder extends Seeder
         $periodicRoles = [RoleName::FISIKAWAN_MEDIS->value, RoleName::ELEKTROMEDIS->value];
         $annualRoles = [RoleName::FISIKAWAN_MEDIS->value];
 
-        return [
+        $definitions = [
             $this->dailyTemplate('XRAY', 'X-Ray', [
                 ['Cek Suhu', 1],
                 ['Cek Kelembapan Ruang', 1],
@@ -393,6 +393,50 @@ class FormTemplateSeeder extends Seeder
                 ['Focal Spot Size', 3],
             ], $annualRoles),
         ];
+
+        return $this->withSharedQcSections($definitions);
+    }
+
+    private function withSharedQcSections(array $definitions): array
+    {
+        $byEquipment = collect($definitions)
+            ->groupBy('equipment_type')
+            ->map(fn ($items) => collect($items)->keyBy('qc_type'));
+
+        return array_map(function (array $definition) use ($byEquipment) {
+            $group = $byEquipment->get($definition['equipment_type']);
+            if (! $group || ! $group->has('harian') || ! $group->has('bulanan') || ! $group->has('tahunan')) {
+                return $definition;
+            }
+
+            $qcType = $definition['qc_type'];
+            $daily = $group->get('harian');
+            $monthly = $group->get('bulanan');
+            $annual = $group->get('tahunan');
+
+            $definition['description'] .= ' Form memuat pertanyaan harian, bulanan, dan tahunan; seksi yang sesuai jadwal tampil otomatis.';
+            $definition['sections'] = [
+                $this->sectionForQcType($daily['sections'][0], 'harian', $qcType),
+                $this->sectionForQcType($monthly['sections'][0], 'bulanan', $qcType),
+                $this->sectionForQcType($annual['sections'][0], 'tahunan', $qcType),
+                [
+                    ...$annual['sections'][1],
+                    'title' => 'Parameter Tambahan Tahunan',
+                    'hidden_by_default' => true,
+                ],
+                $this->notesSection(),
+            ];
+
+            return $definition;
+        }, $definitions);
+    }
+
+    private function sectionForQcType(array $section, string $sectionQcType, string $activeQcType): array
+    {
+        return [
+            ...$section,
+            'hidden_by_default' => $sectionQcType !== $activeQcType,
+        ];
     }
 
     private function dailyTemplate(string $equipmentCode, string $displayName, array $checks, array $roles): array
@@ -629,17 +673,6 @@ class FormTemplateSeeder extends Seeder
                     'label' => 'Tanggal Kalibrasi',
                     'field_type' => 'date',
                     'show_when' => ['operator' => 'equals', 'value' => 'terkalibrasi'],
-                    'is_required' => true,
-                ],
-                [
-                    'code' => "{$code}_tenggat_kalibrasi",
-                    'label' => 'Tenggat Kalibrasi',
-                    'field_type' => 'date',
-                    'show_when' => ['operator' => 'equals', 'value' => 'terkalibrasi'],
-                    'warning_rules' => [
-                        'warning_if_past_due' => true,
-                        'warning_message' => 'Due date kalibrasi sudah lewat.',
-                    ],
                     'is_required' => true,
                 ],
             ],

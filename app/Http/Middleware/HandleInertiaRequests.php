@@ -62,7 +62,13 @@ class HandleInertiaRequests extends Middleware
                 'error' => $request->session()->get('error'),
             ],
             'calibrationWarnings' => function () use ($user) {
-                if ($user && ($user->role?->name === 'admin' || !empty($user->role?->permissions['equipment.manage']))) {
+                $permissions = $user?->role?->permissions ?? [];
+                $canManageEquipment = $user?->role?->name === 'admin' || ! empty($permissions['equipment.manage']);
+                $canSubmitQc = ($permissions['qc.submit'] ?? null) === '*'
+                    || ($permissions['qc.submit'] ?? null) === true
+                    || (is_array($permissions['qc.submit'] ?? null) && ! empty($permissions['qc.submit']));
+
+                if ($user && ($canManageEquipment || $canSubmitQc)) {
                     return \App\Models\EquipmentUnit::where('status', 'aktif')
                         ->whereNotNull('tanggal_kalibrasi_berikutnya')
                         ->where('tanggal_kalibrasi_berikutnya', '<=', now()->addDays(30))

@@ -80,6 +80,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
     const hasQcSubmitPermission = user?.role?.permissions?.['qc.submit'] === '*' || 
         user?.role?.permissions?.['qc.submit'] === true || 
         (Array.isArray(user?.role?.permissions?.['qc.submit']) && user.role.permissions['qc.submit'].length > 0);
+    const canManageEquipment = user?.role?.permissions?.['equipment.manage'] === true || user?.role?.name === 'admin';
+    const calibrationWarningHref = canManageEquipment ? route('admin.equipment.index') : route('qc.select-unit');
 
     const navigation = [
         {
@@ -120,7 +122,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
             href: route('admin.equipment.index'),
             icon: Building,
             active: currentRoute.startsWith('admin.equipment'),
-            show: user?.role?.permissions?.['equipment.manage'] === true || user?.role?.name === 'admin'
+            show: canManageEquipment
         },
         {
             name: 'Manajemen User',
@@ -261,7 +263,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                                 {calibrationWarnings.map(warning => (
                                                     <Link 
                                                         key={warning.id}
-                                                        href={route('admin.equipment.index')}
+                                                        href={calibrationWarningHref}
                                                         className="block px-3 py-2.5 text-xs rounded-lg bg-white/70 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-rose-200 dark:hover:border-rose-800 text-slate-700 dark:text-slate-300 transition-colors shadow-xs"
                                                     >
                                                         <div className="font-semibold truncate">{warning.name}</div>
@@ -401,7 +403,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                                         {calibrationWarnings.map(warning => (
                                                             <Link 
                                                                 key={warning.id}
-                                                                href={route('admin.equipment.index')}
+                                                                href={calibrationWarningHref}
                                                                 onClick={() => setSidebarOpen(false)}
                                                                 className="block px-3 py-2.5 text-xs rounded-lg bg-white/70 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-800 border border-transparent hover:border-rose-200 dark:hover:border-rose-800 text-slate-700 dark:text-slate-300 transition-colors shadow-xs"
                                                             >
