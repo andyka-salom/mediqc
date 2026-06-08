@@ -88,6 +88,13 @@ interface SubmitProps {
 
 export default function Submit({ equipmentUnit, template, qcType }: SubmitProps) {
     const today = new Date().toISOString().split('T')[0];
+    const normalizeQuestionSectionTitle = (title: string) =>
+        title.replace(/^Pertanyaan\s+(Harian|Bulanan|Tahunan)$/i, 'Pertanyaan');
+
+    const normalizeQuestionSectionDescription = (description: string | null) =>
+        description
+            ?.replace(/^Pertanyaan\s+(harian|bulanan|tahunan)\s+/i, 'Pertanyaan ')
+            ?.replace(/^Pertanyaan\s+tahunan\s+yang\s+/i, 'Pertanyaan yang ') ?? null;
 
     // Initialize form answers
     const initialAnswers: Record<number, any> = {};
@@ -893,6 +900,8 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                             {template.sections.map((section) => {
                                 const hasVisibleFields = section.fields.some(shouldShowField);
                                 if (!hasVisibleFields) return null;
+                                const sectionTitle = normalizeQuestionSectionTitle(section.title);
+                                const sectionDescription = normalizeQuestionSectionDescription(section.description);
 
                                 return (
                                     <div 
@@ -902,9 +911,9 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                                         {/* Section Header */}
                                         <div className="px-6 py-4 bg-slate-50/50 dark:bg-slate-955 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4">
                                             <div>
-                                                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{section.title}</h3>
-                                                {section.description && (
-                                                    <p className="text-xs text-slate-500 mt-0.5">{section.description}</p>
+                                                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">{sectionTitle}</h3>
+                                                {sectionDescription && (
+                                                    <p className="text-xs text-slate-500 mt-0.5">{sectionDescription}</p>
                                                 )}
                                             </div>
                                             {section.hidden_by_default && (

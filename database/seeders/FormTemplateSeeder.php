@@ -449,8 +449,8 @@ class FormTemplateSeeder extends Seeder
             'allowed_roles' => $roles,
             'sections' => [
                 [
-                    'title' => 'Pertanyaan Harian',
-                    'description' => 'Pertanyaan harian sesuai tabel rekap; opsi mengikuti pola jawaban QC.',
+                    'title' => 'Pertanyaan',
+                    'description' => 'Pertanyaan sesuai tabel rekap; opsi mengikuti pola jawaban QC.',
                     'fields' => array_map(fn (array $check) => $this->fieldByChoice($equipmentCode, $check[0], $check[1]), $checks),
                 ],
                 $this->notesSection(),
@@ -468,8 +468,8 @@ class FormTemplateSeeder extends Seeder
             'allowed_roles' => $roles,
             'sections' => [
                 [
-                    'title' => 'Pertanyaan Bulanan',
-                    'description' => 'Pertanyaan bulanan sesuai tabel rekap; opsi mengikuti pola jawaban QC.',
+                    'title' => 'Pertanyaan',
+                    'description' => 'Pertanyaan sesuai tabel rekap; opsi mengikuti pola jawaban QC.',
                     'fields' => array_map(fn (array $check) => $this->fieldByChoice($equipmentCode, $check[0], $check[1]), $checks),
                 ],
                 $this->notesSection(),
@@ -487,8 +487,8 @@ class FormTemplateSeeder extends Seeder
             'allowed_roles' => $roles,
             'sections' => [
                 [
-                    'title' => 'Pertanyaan Tahunan',
-                    'description' => 'Pertanyaan tahunan yang selalu muncul.',
+                    'title' => 'Pertanyaan',
+                    'description' => 'Pertanyaan yang selalu muncul.',
                     'fields' => array_map(fn (array $selection) => $this->fieldByChoice($equipmentCode, $selection[0], $selection[1]), $visibleSelections),
                 ],
                 [
