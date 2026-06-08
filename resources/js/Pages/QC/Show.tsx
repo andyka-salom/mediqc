@@ -65,7 +65,7 @@ interface EquipmentUnit {
 }
 
 interface QcAnswer {
-    id: number;
+    id: string;
     form_field_id: number;
     field_snapshot_label: string;
     field_snapshot_unit: string | null;
@@ -103,6 +103,22 @@ interface ShowProps {
 }
 
 export default function Show({ submission }: ShowProps) {
+    const answerByFieldId = new Map(submission.answers.map(answer => [answer.form_field_id, answer]));
+
+    const hasAnswerValue = (answer: QcAnswer) => {
+        if (answer.value_numeric !== null) return true;
+        if (answer.value_boolean !== null) return true;
+        if (answer.value_date) return true;
+        if (answer.value_time) return true;
+        if (answer.file_path) return true;
+        if (answer.value_text) return true;
+        if (Array.isArray(answer.value_json)) return answer.value_json.length > 0;
+        if (answer.value_json && typeof answer.value_json === 'object') {
+            return Object.keys(answer.value_json).length > 0;
+        }
+        return answer.value_json !== null && answer.value_json !== undefined;
+    };
+
     const getStatusConfig = (status: string) => {
         switch (status) {
             case 'needs_action':
@@ -255,9 +271,13 @@ export default function Show({ submission }: ShowProps) {
         };
 
         fields.forEach(field => {
-            const answer = submission.answers.find(a => a.form_field_id === field.id);
+            if (field.field_type === 'info_text') {
+                return;
+            }
 
-            if (!answer && field.field_type !== 'section_header' && field.field_type !== 'info_text') {
+            const answer = answerByFieldId.get(field.id);
+
+            if ((!answer || !hasAnswerValue(answer)) && field.field_type !== 'section_header') {
                 return;
             }
 
@@ -294,8 +314,8 @@ export default function Show({ submission }: ShowProps) {
             return null;
         }
 
-        const answer = submission.answers.find(a => a.form_field_id === field.id);
-        if (!answer) return null;
+        const answer = answerByFieldId.get(field.id);
+        if (!answer || !hasAnswerValue(answer)) return null;
 
         return (
             <div className={cn(
@@ -325,6 +345,45 @@ export default function Show({ submission }: ShowProps) {
             </div>
         );
     };
+
+    const templateFieldIds = new Set(
+        submission.form_template.sections.flatMap(section => section.fields.map(field => field.id))
+    );
+
+    const orphanAnswers = submission.answers.filter(answer => !templateFieldIds.has(answer.form_field_id) && hasAnswerValue(answer));
+
+    const renderSnapshotAnswer = (answer: QcAnswer) => (
+        <div
+            key={answer.id}
+            className={cn(
+                "p-4 rounded-xl border transition-all duration-300 space-y-1.5",
+                answer.has_warning
+                    ? "bg-rose-500/[0.01] border-rose-500/20 shadow-xs"
+                    : "bg-transparent border-transparent"
+            )}
+        >
+            <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    {answer.field_snapshot_label || `Field #${answer.form_field_id}`}
+                </span>
+                {answer.has_warning && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-600 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                        <AlertTriangle className="size-3 shrink-0" /> WARNING
+                    </span>
+                )}
+            </div>
+
+            <div className="text-sm font-semibold text-slate-900 dark:text-white leading-normal">
+                {formatAnswerValue(answer)}
+            </div>
+
+            {answer.has_warning && answer.warning_message && (
+                <div className="text-[10px] font-bold text-rose-500 leading-tight">
+                    Detail: {answer.warning_message}
+                </div>
+            )}
+        </div>
+    );
 
     return (
         <AuthenticatedLayout>
@@ -405,8 +464,8 @@ export default function Show({ submission }: ShowProps) {
                 <div className="space-y-6">
                     {submission.form_template.sections.map((section) => {
                         const visibleFields = section.fields.filter(field => {
-                            const answer = submission.answers.find(a => a.form_field_id === field.id);
-                            return answer || field.field_type === 'section_header';
+                            const answer = answerByFieldId.get(field.id);
+                            return answer && hasAnswerValue(answer);
                         });
 
                         // Don't render sections with no fields
@@ -430,6 +489,19 @@ export default function Show({ submission }: ShowProps) {
                             </div>
                         );
                     })}
+
+                    {orphanAnswers.length > 0 && (
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
+                            <div className="px-6 py-4 bg-slate-50/50 dark:bg-slate-950/20 border-b border-slate-200 dark:border-slate-800">
+                                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">Jawaban Tersimpan Lainnya</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Data ini berasal dari snapshot submission dan ditampilkan hanya baca.</p>
+                            </div>
+
+                            <div className="p-6 space-y-3 divide-y divide-slate-100 dark:divide-slate-850">
+                                {orphanAnswers.map(renderSnapshotAnswer)}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Additional Catatan Masalah */}

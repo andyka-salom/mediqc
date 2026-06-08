@@ -161,7 +161,14 @@ class QcController extends Controller
 
     public function exportPdf(Request $request)
     {
-        $query = QcSubmission::with(['formTemplate', 'equipmentUnit', 'submitter'])
+        $query = QcSubmission::with([
+            'formTemplate.sections.fields' => function ($q) {
+                $q->where('is_active', true)->orderBy('order_index');
+            },
+            'equipmentUnit.equipmentType',
+            'submitter.role',
+            'answers.field',
+        ])
             ->orderByDesc('submission_date')
             ->orderByDesc('created_at');
 
@@ -418,7 +425,7 @@ class QcController extends Controller
         // Semua pengguna terautentikasi dapat melihat seluruh rekam QC (tracking bersama)
         $submission->load([
             'formTemplate.sections.fields' => function ($q) {
-                $q->where('is_active', true)->orderBy('order_index');
+                $q->orderBy('order_index');
             },
             'answers.field',
             'equipmentUnit.equipmentType',
