@@ -99,6 +99,10 @@ class QcController extends Controller
             $query->where('submission_date', '<=', $endDate);
         }
 
+        if ($submissionIds = $request->input('submission_ids')) {
+            $query->whereIn('id', array_filter((array) $submissionIds));
+        }
+
         $submissions = $query->get();
 
         $headers = [
@@ -123,6 +127,8 @@ class QcController extends Controller
                 'Kode Aset',
                 'Merk',
                 'Model',
+                'Kalibrasi Terakhir',
+                'Kalibrasi Berikutnya',
                 'Tipe QC',
                 'Pengisi',
                 'Status',
@@ -141,10 +147,12 @@ class QcController extends Controller
                 fputcsv($file, [
                     $index + 1,
                     $sub->submission_date,
-                    $sub->equipment_unit ? $sub->equipment_unit->name : '—',
-                    $sub->equipment_unit ? $sub->equipment_unit->asset_code : '—',
-                    $sub->equipment_unit ? $sub->equipment_unit->merk : '—',
-                    $sub->equipment_unit ? $sub->equipment_unit->model : '—',
+                    $sub->equipmentUnit ? $sub->equipmentUnit->name : '—',
+                    $sub->equipmentUnit ? $sub->equipmentUnit->asset_code : '—',
+                    $sub->equipmentUnit ? $sub->equipmentUnit->merk : '—',
+                    $sub->equipmentUnit ? $sub->equipmentUnit->model : '—',
+                    $sub->equipmentUnit?->tanggal_kalibrasi_terakhir?->format('Y-m-d') ?? '—',
+                    $sub->equipmentUnit?->tanggal_kalibrasi_berikutnya?->format('Y-m-d') ?? '—',
                     ucfirst($sub->qc_type),
                     $sub->submitter ? $sub->submitter->name : '—',
                     $statusLabel,
@@ -196,6 +204,10 @@ class QcController extends Controller
 
         if ($endDate = $request->input('end_date')) {
             $query->where('submission_date', '<=', $endDate);
+        }
+
+        if ($submissionIds = $request->input('submission_ids')) {
+            $query->whereIn('id', array_filter((array) $submissionIds));
         }
 
         $submissions = $query->get();
@@ -425,7 +437,7 @@ class QcController extends Controller
         // Semua pengguna terautentikasi dapat melihat seluruh rekam QC (tracking bersama)
         $submission->load([
             'formTemplate.sections.fields' => function ($q) {
-                $q->orderBy('order_index');
+                $q->where('is_active', true)->orderBy('order_index');
             },
             'answers.field',
             'equipmentUnit.equipmentType',

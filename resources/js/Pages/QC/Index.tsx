@@ -67,6 +67,11 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
     const [endDate, setEndDate] = useState(filters.end_date || '');
     const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; submission: Submission | null }>({ isOpen: false, submission: null });
     const [isDeleting, setIsDeleting] = useState(false);
+    const [selectedSubmissionIds, setSelectedSubmissionIds] = useState<string[]>([]);
+
+    const currentPageIds = submissions.data.map((sub) => sub.id);
+    const selectedCount = selectedSubmissionIds.length;
+    const allCurrentPageSelected = currentPageIds.length > 0 && currentPageIds.every((id) => selectedSubmissionIds.includes(id));
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
@@ -92,10 +97,11 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
         setStatus('');
         setStartDate('');
         setEndDate('');
+        setSelectedSubmissionIds([]);
         router.get(route('qc.index'));
     };
 
-    const handleExport = () => {
+    const buildExportParams = () => {
         const params = new URLSearchParams({
             search,
             qc_type: qcType,
@@ -103,18 +109,42 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
             start_date: startDate,
             end_date: endDate,
         });
+
+        selectedSubmissionIds.forEach((id) => params.append('submission_ids[]', id));
+
+        return params;
+    };
+
+    const handleExport = () => {
+        if (selectedSubmissionIds.length === 0) return;
+
+        const params = buildExportParams();
         window.location.href = route('qc.export') + '?' + params.toString();
     };
 
     const handleExportPdf = () => {
-        const params = new URLSearchParams({
-            search,
-            qc_type: qcType,
-            status,
-            start_date: startDate,
-            end_date: endDate,
-        });
+        if (selectedSubmissionIds.length === 0) return;
+
+        const params = buildExportParams();
         window.location.href = route('qc.export.pdf') + '?' + params.toString();
+    };
+
+    const toggleSubmissionSelection = (submissionId: string) => {
+        setSelectedSubmissionIds((prev) => (
+            prev.includes(submissionId)
+                ? prev.filter((id) => id !== submissionId)
+                : [...prev, submissionId]
+        ));
+    };
+
+    const toggleCurrentPageSelection = () => {
+        setSelectedSubmissionIds((prev) => {
+            if (allCurrentPageSelected) {
+                return prev.filter((id) => !currentPageIds.includes(id));
+            }
+
+            return Array.from(new Set([...prev, ...currentPageIds]));
+        });
     };
 
     const handleDeleteClick = (submission: Submission) => {
@@ -168,6 +198,11 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
                             Daftar hasil pengisian inspeksi alat medis yang telah diajukan atau disimpan sebagai draf.
                         </p>
+                        {selectedCount > 0 && (
+                            <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 mt-2">
+                                {selectedCount} riwayat dipilih untuk ekspor.
+                            </p>
+                        )}
                     </div>
                     <Link href={route('qc.select-unit')}>
                         <Button className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/15">
@@ -260,6 +295,7 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                                 <Button
                                     type="button"
                                     onClick={handleExport}
+                                    disabled={selectedCount === 0}
                                     className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/10 text-xs"
                                 >
                                     <FileSpreadsheet className="size-4 shrink-0" />
@@ -268,6 +304,7 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                                 <Button
                                     type="button"
                                     onClick={handleExportPdf}
+                                    disabled={selectedCount === 0}
                                     className="flex-1 bg-rose-600 hover:bg-rose-500 text-white font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-rose-500/10 text-xs"
                                 >
                                     <FileText className="size-4 shrink-0" />
@@ -285,6 +322,15 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="bg-slate-50 dark:bg-slate-950/40 border-b border-slate-200 dark:border-slate-800">
+                                        <th className="px-6 py-4">
+                                            <input
+                                                type="checkbox"
+                                                checked={allCurrentPageSelected}
+                                                onChange={toggleCurrentPageSelection}
+                                                aria-label="Pilih semua riwayat di halaman ini"
+                                                className="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                        </th>
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tanggal</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Peralatan Medis</th>
                                         <th className="px-6 py-4 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Interval QC</th>
@@ -301,6 +347,15 @@ export default function Index({ submissions, filters, isAdmin, currentUserId }: 
 
                                         return (
                                             <tr key={sub.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-950/20 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedSubmissionIds.includes(sub.id)}
+                                                        onChange={() => toggleSubmissionSelection(sub.id)}
+                                                        aria-label={`Pilih riwayat ${sub.equipment_unit.name}`}
+                                                        className="size-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                </td>
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                                     {new Date(sub.submission_date).toLocaleDateString('id-ID', {
                                                         day: '2-digit',

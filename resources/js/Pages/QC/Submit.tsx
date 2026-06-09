@@ -78,6 +78,8 @@ interface EquipmentUnit {
     ruangan: string;
     merk: string;
     model: string;
+    tanggal_kalibrasi_terakhir: string | null;
+    tanggal_kalibrasi_berikutnya: string | null;
 }
 
 interface SubmitProps {
@@ -88,6 +90,13 @@ interface SubmitProps {
 
 export default function Submit({ equipmentUnit, template, qcType }: SubmitProps) {
     const today = new Date().toISOString().split('T')[0];
+    const formatDate = (date: string | null) => date
+        ? new Date(date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+        : 'Belum diisi';
+    const nextCalibrationDate = equipmentUnit.tanggal_kalibrasi_berikutnya
+        ? new Date(equipmentUnit.tanggal_kalibrasi_berikutnya)
+        : null;
+    const calibrationOverdue = nextCalibrationDate ? nextCalibrationDate < new Date(new Date().toDateString()) : false;
     const normalizeQuestionSectionTitle = (title: string) =>
         title.replace(/^Pertanyaan\s+(Harian|Bulanan|Tahunan)$/i, 'Pertanyaan');
 
@@ -844,7 +853,7 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
 
                 {/* Equipment Unit Meta Card */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
                         <div className="flex items-start gap-3">
                             <Building className="size-5 text-slate-400 mt-0.5 shrink-0" />
                             <div>
@@ -866,7 +875,7 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                         <div className="flex items-start gap-3">
                             <Calendar className="size-5 text-slate-400 mt-0.5 shrink-0" />
                             <div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal & Batas Jadwal</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tanggal QC</p>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                     <input 
                                         type="date" 
@@ -875,6 +884,25 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                                         className="text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-0.5 outline-none font-semibold focus:border-indigo-500"
                                     />
                                 </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <AlertTriangle className={cn(
+                                "size-5 mt-0.5 shrink-0",
+                                calibrationOverdue ? "text-amber-500" : "text-slate-400"
+                            )} />
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Kalibrasi Alat</p>
+                                <p className="text-xs text-slate-500">
+                                    Terakhir: <span className="font-semibold text-slate-700 dark:text-slate-300">{formatDate(equipmentUnit.tanggal_kalibrasi_terakhir)}</span>
+                                </p>
+                                <p className={cn(
+                                    "text-xs",
+                                    calibrationOverdue ? "font-bold text-amber-600 dark:text-amber-400" : "text-slate-500"
+                                )}>
+                                    Berikutnya: <span className="font-semibold">{formatDate(equipmentUnit.tanggal_kalibrasi_berikutnya)}</span>
+                                </p>
                             </div>
                         </div>
                     </div>

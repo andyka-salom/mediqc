@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 
 class FormTemplateSeeder extends Seeder
 {
-    private const TEMPLATE_VERSION = 6;
+    private const TEMPLATE_VERSION = 7;
 
     private ?string $adminId = null;
 
@@ -465,7 +465,7 @@ class FormTemplateSeeder extends Seeder
                 [
                     'title' => 'Pertanyaan',
                     'description' => 'Pertanyaan sesuai tabel rekap; opsi mengikuti pola jawaban QC.',
-                    'fields' => array_map(fn (array $check) => $this->fieldByChoice($equipmentCode, $check[0], $check[1]), $checks),
+                    'fields' => $this->fieldsFromSelections($equipmentCode, $checks),
                 ],
                 $this->notesSection(),
             ],
@@ -484,7 +484,7 @@ class FormTemplateSeeder extends Seeder
                 [
                     'title' => 'Pertanyaan',
                     'description' => 'Pertanyaan sesuai tabel rekap; opsi mengikuti pola jawaban QC.',
-                    'fields' => array_map(fn (array $check) => $this->fieldByChoice($equipmentCode, $check[0], $check[1]), $checks),
+                    'fields' => $this->fieldsFromSelections($equipmentCode, $checks),
                 ],
                 $this->notesSection(),
             ],
@@ -503,13 +503,13 @@ class FormTemplateSeeder extends Seeder
                 [
                     'title' => 'Pertanyaan',
                     'description' => 'Pertanyaan yang selalu muncul.',
-                    'fields' => array_map(fn (array $selection) => $this->fieldByChoice($equipmentCode, $selection[0], $selection[1]), $visibleSelections),
+                    'fields' => $this->fieldsFromSelections($equipmentCode, $visibleSelections),
                 ],
                 [
                     'title' => 'Hidden Selections',
                     'description' => 'Parameter tambahan tahunan yang dapat ditambahkan bila diperlukan.',
                     'hidden_by_default' => true,
-                    'fields' => array_map(fn (array $selection) => $this->fieldByChoice($equipmentCode, $selection[0], $selection[1]), $hiddenSelections),
+                    'fields' => $this->fieldsFromSelections($equipmentCode, $hiddenSelections),
                 ],
                 $this->notesSection(),
             ],
@@ -533,12 +533,29 @@ class FormTemplateSeeder extends Seeder
         ];
     }
 
+    private function fieldsFromSelections(string $equipmentCode, array $selections): array
+    {
+        return collect($selections)
+            ->reject(fn (array $selection) => $this->isCalibrationQuestion($selection[0]))
+            ->map(fn (array $selection) => $this->fieldByChoice($equipmentCode, $selection[0], $selection[1]))
+            ->values()
+            ->all();
+    }
+
+    private function isCalibrationQuestion(string $label): bool
+    {
+        $normalized = Str::of($label)->ascii()->lower()->toString();
+
+        return str_contains($normalized, 'kalibrasi')
+            || str_contains($normalized, 'callibration')
+            || str_contains($normalized, 'calibration');
+    }
+
     private function fieldByChoice(string $equipmentCode, string $label, int $choice): array
     {
         return match ($choice) {
             2 => $this->baikTroubleField($label),
             3 => $this->yesNoValueField($label),
-            4 => $this->calibrationField($label),
             5 => $this->leakageField($this->codeFromLabel($label), $label),
             6 => $this->yesNoDateField($this->codeFromLabel($label), $label),
             default => $this->measurementField($equipmentCode, $label),
@@ -649,44 +666,6 @@ class FormTemplateSeeder extends Seeder
                     'show_when' => ['operator' => 'equals', 'value' => 'yes'],
                     'layout_group' => $layoutGroup,
                     'layout_width' => 6,
-                    'is_required' => true,
-                ],
-            ],
-        ];
-    }
-
-    private function calibrationField(?string $label = null): array
-    {
-        $code = $label ? $this->codeFromLabel($label) : 'kalibrasi_pesawat';
-
-        return [
-            'code' => $code,
-            'label' => $label ?? 'Kalibrasi Pesawat',
-            'field_type' => 'radio',
-            'config' => [
-                'options' => [
-                    ['value' => 'terkalibrasi', 'label' => 'Terkalibrasi'],
-                    ['value' => 'belum_terkalibrasi', 'label' => 'Belum Terkalibrasi'],
-                ],
-            ],
-            'warning_rules' => [
-                'warning_if_value_in' => ['belum_terkalibrasi'],
-                'warning_message' => 'Calibration Required.',
-            ],
-            'is_required' => true,
-            'children' => [
-                [
-                    'code' => "{$code}_nomor_izin",
-                    'label' => 'Nomor Izin Operasional Alat',
-                    'field_type' => 'text',
-                    'show_when' => ['operator' => 'equals', 'value' => 'terkalibrasi'],
-                    'is_required' => true,
-                ],
-                [
-                    'code' => "{$code}_tanggal_kalibrasi",
-                    'label' => 'Tanggal Kalibrasi',
-                    'field_type' => 'date',
-                    'show_when' => ['operator' => 'equals', 'value' => 'terkalibrasi'],
                     'is_required' => true,
                 ],
             ],

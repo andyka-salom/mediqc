@@ -139,6 +139,59 @@
             };
         };
 
+        $hasMeaningfulValue = function ($value) use (&$hasMeaningfulValue): bool {
+            if ($value === null) {
+                return false;
+            }
+
+            if (is_bool($value) || is_numeric($value)) {
+                return true;
+            }
+
+            if (is_string($value)) {
+                return trim($value) !== '';
+            }
+
+            if (is_array($value)) {
+                foreach ($value as $item) {
+                    if ($hasMeaningfulValue($item)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return true;
+        };
+
+        $hasAnswer = function ($answer) use ($hasMeaningfulValue): bool {
+            if (! $answer) {
+                return false;
+            }
+
+            return $answer->value_numeric !== null
+                || $answer->value_boolean !== null
+                || $answer->value_date !== null
+                || $answer->value_time !== null
+                || $hasMeaningfulValue($answer->value_json)
+                || $hasMeaningfulValue($answer->file_path)
+                || $hasMeaningfulValue($answer->value_text);
+        };
+
+        $isCalibrationAnswer = function ($answer): bool {
+            if (! $answer) {
+                return false;
+            }
+
+            $label = strtolower((string) $answer->field_snapshot_label);
+
+            return str_contains($label, 'kalibrasi')
+                || str_contains($label, 'callibration')
+                || str_contains($label, 'calibration')
+                || str_contains($label, 'nomor izin operasional alat');
+        };
+
         $formatAnswer = function ($answer): string {
             if (! $answer) {
                 return '-';
@@ -242,6 +295,12 @@
                     <td class="value">{{ trim(($sub->equipmentUnit?->merk ?? '').' '.($sub->equipmentUnit?->model ?? '')) ?: '-' }}</td>
                 </tr>
                 <tr>
+                    <td class="label">Kalibrasi Terakhir</td>
+                    <td class="value">{{ $sub->equipmentUnit?->tanggal_kalibrasi_terakhir ? \Carbon\Carbon::parse($sub->equipmentUnit->tanggal_kalibrasi_terakhir)->format('d/m/Y') : '-' }}</td>
+                    <td class="label">Kalibrasi Berikutnya</td>
+                    <td class="value">{{ $sub->equipmentUnit?->tanggal_kalibrasi_berikutnya ? \Carbon\Carbon::parse($sub->equipmentUnit->tanggal_kalibrasi_berikutnya)->format('d/m/Y') : '-' }}</td>
+                </tr>
+                <tr>
                     <td class="label">Pengisi</td>
                     <td class="value">{{ $sub->submitter?->name ?? '-' }}{{ $sub->submitter?->role?->display_name ? ' - '.$sub->submitter->role->display_name : '' }}</td>
                     <td class="label">Status</td>
@@ -255,7 +314,7 @@
             @foreach($sub->formTemplate?->sections ?? [] as $section)
                 @php
                     $rows = $section->fields
-                        ->filter(fn ($field) => $answersByField->has($field->id))
+                        ->filter(fn ($field) => $hasAnswer($answersByField->get($field->id)) && ! $isCalibrationAnswer($answersByField->get($field->id)))
                         ->values();
                 @endphp
 
@@ -298,7 +357,7 @@
                     ? $sub->formTemplate->sections->flatMap(fn ($section) => $section->fields)->pluck('id')
                     : collect();
                 $orphanAnswers = $sub->answers
-                    ->filter(fn ($answer) => ! $templateFieldIds->contains($answer->form_field_id))
+                    ->filter(fn ($answer) => ! $templateFieldIds->contains($answer->form_field_id) && $hasAnswer($answer) && ! $isCalibrationAnswer($answer))
                     ->values();
             @endphp
 

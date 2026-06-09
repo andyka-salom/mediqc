@@ -59,6 +59,8 @@ interface EquipmentUnit {
     ruangan: string;
     merk: string;
     model: string;
+    tanggal_kalibrasi_terakhir: string | null;
+    tanggal_kalibrasi_berikutnya: string | null;
     equipment_type?: {
         display_name: string;
     };
@@ -104,6 +106,18 @@ interface ShowProps {
 
 export default function Show({ submission }: ShowProps) {
     const answerByFieldId = new Map(submission.answers.map(answer => [answer.form_field_id, answer]));
+    const formatEquipmentDate = (date: string | null) => date
+        ? new Date(date).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
+        : 'Belum diisi';
+
+    const isCalibrationAnswer = (answer: QcAnswer) => {
+        const label = (answer.field_snapshot_label || '').toLowerCase();
+
+        return label.includes('kalibrasi')
+            || label.includes('callibration')
+            || label.includes('calibration')
+            || label.includes('nomor izin operasional alat');
+    };
 
     const hasAnswerValue = (answer: QcAnswer) => {
         if (answer.value_numeric !== null) return true;
@@ -277,6 +291,10 @@ export default function Show({ submission }: ShowProps) {
 
             const answer = answerByFieldId.get(field.id);
 
+            if (answer && isCalibrationAnswer(answer)) {
+                return;
+            }
+
             if ((!answer || !hasAnswerValue(answer)) && field.field_type !== 'section_header') {
                 return;
             }
@@ -315,6 +333,7 @@ export default function Show({ submission }: ShowProps) {
         }
 
         const answer = answerByFieldId.get(field.id);
+        if (answer && isCalibrationAnswer(answer)) return null;
         if (!answer || !hasAnswerValue(answer)) return null;
 
         return (
@@ -350,7 +369,7 @@ export default function Show({ submission }: ShowProps) {
         submission.form_template.sections.flatMap(section => section.fields.map(field => field.id))
     );
 
-    const orphanAnswers = submission.answers.filter(answer => !templateFieldIds.has(answer.form_field_id) && hasAnswerValue(answer));
+    const orphanAnswers = submission.answers.filter(answer => !templateFieldIds.has(answer.form_field_id) && hasAnswerValue(answer) && !isCalibrationAnswer(answer));
 
     const renderSnapshotAnswer = (answer: QcAnswer) => (
         <div
@@ -414,7 +433,7 @@ export default function Show({ submission }: ShowProps) {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs grid grid-cols-1 md:grid-cols-4 gap-5">
                     <div className="flex items-start gap-3">
                         <User className="size-5 text-slate-400 mt-0.5 shrink-0" />
                         <div>
@@ -449,6 +468,19 @@ export default function Show({ submission }: ShowProps) {
                             )}
                         </div>
                     </div>
+
+                    <div className="flex items-start gap-3">
+                        <AlertTriangle className="size-5 text-slate-400 mt-0.5 shrink-0" />
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Kalibrasi Alat</p>
+                            <p className="text-xs text-slate-500">
+                                Terakhir: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatEquipmentDate(submission.equipment_unit.tanggal_kalibrasi_terakhir)}</span>
+                            </p>
+                            <p className="text-xs text-slate-500">
+                                Berikutnya: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatEquipmentDate(submission.equipment_unit.tanggal_kalibrasi_berikutnya)}</span>
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
                 {submission.warning_count > 0 && (
@@ -465,7 +497,7 @@ export default function Show({ submission }: ShowProps) {
                     {submission.form_template.sections.map((section) => {
                         const visibleFields = section.fields.filter(field => {
                             const answer = answerByFieldId.get(field.id);
-                            return answer && hasAnswerValue(answer);
+                            return answer && hasAnswerValue(answer) && !isCalibrationAnswer(answer);
                         });
 
                         // Don't render sections with no fields

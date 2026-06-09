@@ -38,7 +38,9 @@ class SubmissionService
     public function submit(User $user, array $payload): QcSubmission
     {
         return DB::transaction(function () use ($user, $payload) {
-            $template = FormTemplate::with('fields')->findOrFail($payload['form_template_id']);
+            $template = FormTemplate::with(['fields' => function ($query) {
+                $query->where('is_active', true);
+            }])->findOrFail($payload['form_template_id']);
 
             $isFinalSubmit = (bool) ($payload['submit'] ?? false);
             $status        = $isFinalSubmit
@@ -83,7 +85,9 @@ class SubmissionService
     public function updateSubmission(QcSubmission $submission, array $payload, User $user): QcSubmission
     {
         return DB::transaction(function () use ($submission, $payload, $user) {
-            $template = FormTemplate::with('fields')->findOrFail($submission->form_template_id);
+            $template = FormTemplate::with(['fields' => function ($query) {
+                $query->where('is_active', true);
+            }])->findOrFail($submission->form_template_id);
 
             $isFinalSubmit = (bool) ($payload['submit'] ?? false);
             $status        = $isFinalSubmit
