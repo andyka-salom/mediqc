@@ -37,6 +37,7 @@ interface EquipmentUnit {
     merk: string | null;
     model: string | null;
     serial_number: string | null;
+    nomor_izin_operasional: string | null;
     ruangan: string | null;
     tahun_pengadaan: string | null;
     tanggal_kalibrasi_terakhir: string | null;
@@ -163,6 +164,7 @@ export default function Index({ units, types, filters }: IndexProps) {
         merk: '',
         model: '',
         serial_number: '',
+        nomor_izin_operasional: '',
         ruangan: '',
         tahun_pengadaan: '',
         tanggal_kalibrasi_terakhir: '',
@@ -232,7 +234,7 @@ export default function Index({ units, types, filters }: IndexProps) {
         unitForm.setData({
             equipment_type_id: types[0]?.id.toString() || '',
             asset_code: '', name: '', merk: '', model: '', serial_number: '',
-            ruangan: '', tahun_pengadaan: '', tanggal_kalibrasi_terakhir: '',
+            nomor_izin_operasional: '', ruangan: '', tahun_pengadaan: '', tanggal_kalibrasi_terakhir: '',
             tanggal_kalibrasi_berikutnya: '', status: 'aktif', catatan: '', is_active: true,
             qc_schedule_config: defaultQcScheduleConfig,
         });
@@ -248,6 +250,7 @@ export default function Index({ units, types, filters }: IndexProps) {
             merk: u.merk || '',
             model: u.model || '',
             serial_number: u.serial_number || '',
+            nomor_izin_operasional: u.nomor_izin_operasional || '',
             ruangan: u.ruangan || '',
             tahun_pengadaan: u.tahun_pengadaan ? u.tahun_pengadaan.substring(0, 10) : '',
             tanggal_kalibrasi_terakhir: u.tanggal_kalibrasi_terakhir ? u.tanggal_kalibrasi_terakhir.substring(0, 10) : '',
@@ -377,7 +380,7 @@ export default function Index({ units, types, filters }: IndexProps) {
                                     <Search className="absolute left-3 top-2.5 size-4 text-slate-400" />
                                     <input
                                         type="text"
-                                        placeholder="Cari unit (Nama/Kode/Merk/Model/SN/Ruangan)..."
+                                        placeholder="Cari unit (Nama/Kode/Merk/Model/SN/Izin/Ruangan)..."
                                         value={search}
                                         onChange={(e) => setSearch(e.target.value)}
                                         className="w-full pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm placeholder-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
@@ -450,6 +453,9 @@ export default function Index({ units, types, filters }: IndexProps) {
                                                                 <div>
                                                                     <h4 className="text-sm font-semibold text-slate-900 dark:text-white leading-none">{unit.name}</h4>
                                                                     <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 font-mono">{unit.asset_code}</p>
+                                                                    {unit.nomor_izin_operasional && (
+                                                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-mono">Izin: {unit.nomor_izin_operasional}</p>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </td>
@@ -741,6 +747,14 @@ export default function Index({ units, types, filters }: IndexProps) {
                                             className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all"
                                             placeholder="R. Radiologi Lt. 1" />
                                     </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wide">Nomor Izin Operasional Alat</label>
+                                    <input type="text" value={unitForm.data.nomor_izin_operasional} onChange={e => unitForm.setData('nomor_izin_operasional', e.target.value)}
+                                        className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 outline-none transition-all"
+                                        placeholder="Contoh: 503/IOA/RS/2026" />
+                                    {unitForm.errors.nomor_izin_operasional && <p className="text-rose-500 text-[10px] font-bold">{unitForm.errors.nomor_izin_operasional}</p>}
                                 </div>
 
                                 {/* Dates */}

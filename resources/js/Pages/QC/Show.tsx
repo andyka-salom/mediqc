@@ -59,6 +59,7 @@ interface EquipmentUnit {
     ruangan: string;
     merk: string;
     model: string;
+    nomor_izin_operasional: string | null;
     tanggal_kalibrasi_terakhir: string | null;
     tanggal_kalibrasi_berikutnya: string | null;
     equipment_type?: {
@@ -472,7 +473,10 @@ export default function Show({ submission }: ShowProps) {
                     <div className="flex items-start gap-3">
                         <AlertTriangle className="size-5 text-slate-400 mt-0.5 shrink-0" />
                         <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Kalibrasi Alat</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Izin & Kalibrasi Alat</p>
+                            <p className="text-xs text-slate-500">
+                                Izin: <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">{submission.equipment_unit.nomor_izin_operasional || 'Belum diisi'}</span>
+                            </p>
                             <p className="text-xs text-slate-500">
                                 Terakhir: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatEquipmentDate(submission.equipment_unit.tanggal_kalibrasi_terakhir)}</span>
                             </p>

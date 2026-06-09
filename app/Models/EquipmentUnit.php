@@ -18,6 +18,7 @@ class EquipmentUnit extends Model
         'merk',
         'model',
         'serial_number',
+        'nomor_izin_operasional',
         'ruangan',
         'tahun_pengadaan',
         'tanggal_kalibrasi_terakhir',

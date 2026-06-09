@@ -24,6 +24,7 @@ class EquipmentController extends Controller
                   ->orWhere('merk', 'like', "%{$search}%")
                   ->orWhere('model', 'like', "%{$search}%")
                   ->orWhere('serial_number', 'like', "%{$search}%")
+                  ->orWhere('nomor_izin_operasional', 'like', "%{$search}%")
                   ->orWhere('ruangan', 'like', "%{$search}%");
             });
         }
@@ -111,6 +112,7 @@ class EquipmentController extends Controller
             'merk' => 'nullable|string|max:100',
             'model' => 'nullable|string|max:100',
             'serial_number' => 'nullable|string|max:100',
+            'nomor_izin_operasional' => 'nullable|string|max:150',
             'ruangan' => 'nullable|string|max:100',
             'tahun_pengadaan' => 'nullable|date',
             'tanggal_kalibrasi_terakhir' => 'nullable|date',
@@ -149,6 +151,7 @@ class EquipmentController extends Controller
             'merk' => 'nullable|string|max:100',
             'model' => 'nullable|string|max:100',
             'serial_number' => 'nullable|string|max:100',
+            'nomor_izin_operasional' => 'nullable|string|max:150',
             'ruangan' => 'nullable|string|max:100',
             'tahun_pengadaan' => 'nullable|date',
             'tanggal_kalibrasi_terakhir' => 'nullable|date',

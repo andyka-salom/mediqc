@@ -301,6 +301,10 @@
                     <td class="value">{{ $sub->equipmentUnit?->tanggal_kalibrasi_berikutnya ? \Carbon\Carbon::parse($sub->equipmentUnit->tanggal_kalibrasi_berikutnya)->format('d/m/Y') : '-' }}</td>
                 </tr>
                 <tr>
+                    <td class="label">Nomor Izin Operasional</td>
+                    <td class="value" colspan="3">{{ $sub->equipmentUnit?->nomor_izin_operasional ?? '-' }}</td>
+                </tr>
+                <tr>
                     <td class="label">Pengisi</td>
                     <td class="value">{{ $sub->submitter?->name ?? '-' }}{{ $sub->submitter?->role?->display_name ? ' - '.$sub->submitter->role->display_name : '' }}</td>
                     <td class="label">Status</td>

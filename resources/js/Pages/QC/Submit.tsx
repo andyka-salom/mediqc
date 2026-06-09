@@ -78,6 +78,7 @@ interface EquipmentUnit {
     ruangan: string;
     merk: string;
     model: string;
+    nomor_izin_operasional: string | null;
     tanggal_kalibrasi_terakhir: string | null;
     tanggal_kalibrasi_berikutnya: string | null;
 }
@@ -121,6 +122,7 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
         equipment_unit_id: equipmentUnit.id,
         qc_type: qcType,
         submission_date: today,
+        nomor_izin_operasional: equipmentUnit.nomor_izin_operasional ?? '',
         tanggal_kalibrasi_terakhir: equipmentUnit.tanggal_kalibrasi_terakhir?.substring(0, 10) ?? '',
         tanggal_kalibrasi_berikutnya: equipmentUnit.tanggal_kalibrasi_berikutnya?.substring(0, 10) ?? '',
         answers: initialAnswers,
@@ -893,7 +895,17 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                                 calibrationOverdue ? "text-amber-500" : "text-slate-400"
                             )} />
                             <div className="w-full space-y-2">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Kalibrasi Alat</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Izin & Kalibrasi Alat</p>
+                                <label className="block space-y-1">
+                                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Nomor Izin Operasional</span>
+                                    <input
+                                        type="text"
+                                        value={data.nomor_izin_operasional}
+                                        onChange={e => setData('nomor_izin_operasional', e.target.value)}
+                                        placeholder="Belum diisi"
+                                        className="w-full text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 outline-none font-mono font-semibold focus:border-indigo-500"
+                                    />
+                                </label>
                                 <label className="block space-y-1">
                                     <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Kalibrasi Terakhir</span>
                                     <input

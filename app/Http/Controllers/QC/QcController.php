@@ -127,6 +127,7 @@ class QcController extends Controller
                 'Kode Aset',
                 'Merk',
                 'Model',
+                'Nomor Izin Operasional',
                 'Kalibrasi Terakhir',
                 'Kalibrasi Berikutnya',
                 'Tipe QC',
@@ -151,6 +152,7 @@ class QcController extends Controller
                     $sub->equipmentUnit ? $sub->equipmentUnit->asset_code : '—',
                     $sub->equipmentUnit ? $sub->equipmentUnit->merk : '—',
                     $sub->equipmentUnit ? $sub->equipmentUnit->model : '—',
+                    $sub->equipmentUnit?->nomor_izin_operasional ?? '—',
                     $sub->equipmentUnit?->tanggal_kalibrasi_terakhir?->format('Y-m-d') ?? '—',
                     $sub->equipmentUnit?->tanggal_kalibrasi_berikutnya?->format('Y-m-d') ?? '—',
                     ucfirst($sub->qc_type),
@@ -356,6 +358,7 @@ class QcController extends Controller
             'equipment_unit_id' => 'required|exists:equipment_units,id',
             'qc_type' => 'required|string',
             'submission_date' => 'required|date',
+            'nomor_izin_operasional' => 'nullable|string|max:150',
             'tanggal_kalibrasi_terakhir' => 'nullable|date',
             'tanggal_kalibrasi_berikutnya' => 'nullable|date',
             'answers' => 'required|array',
@@ -402,6 +405,7 @@ class QcController extends Controller
 
         $request->validate([
             'answers' => 'required|array',
+            'nomor_izin_operasional' => 'nullable|string|max:150',
             'tanggal_kalibrasi_terakhir' => 'nullable|date',
             'tanggal_kalibrasi_berikutnya' => 'nullable|date',
             'catatan_masalah' => 'nullable|string',
