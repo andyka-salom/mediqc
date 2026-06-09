@@ -356,6 +356,8 @@ class QcController extends Controller
             'equipment_unit_id' => 'required|exists:equipment_units,id',
             'qc_type' => 'required|string',
             'submission_date' => 'required|date',
+            'tanggal_kalibrasi_terakhir' => 'nullable|date',
+            'tanggal_kalibrasi_berikutnya' => 'nullable|date',
             'answers' => 'required|array',
             'catatan_masalah' => 'nullable|string',
             'submit' => 'required|boolean',
@@ -400,6 +402,8 @@ class QcController extends Controller
 
         $request->validate([
             'answers' => 'required|array',
+            'tanggal_kalibrasi_terakhir' => 'nullable|date',
+            'tanggal_kalibrasi_berikutnya' => 'nullable|date',
             'catatan_masalah' => 'nullable|string',
             'submit' => 'required|boolean',
         ]);

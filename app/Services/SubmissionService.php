@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\FieldType;
 use App\Enums\SubmissionStatus;
 use App\Models\AuditLog;
+use App\Models\EquipmentUnit;
 use App\Models\FormField;
 use App\Models\FormTemplate;
 use App\Models\QcAnswer;
@@ -62,6 +63,8 @@ class SubmissionService
                 'submitted_at'     => $isFinalSubmit ? now() : null,
             ]);
 
+            $this->updateEquipmentCalibration($payload['equipment_unit_id'], $payload);
+
             $warningCount = $this->saveAnswers($submission, $template->fields, $payload['answers'] ?? []);
 
             $submission->update([
@@ -101,6 +104,8 @@ class SubmissionService
                 'is_complete'     => $isFinalSubmit,
                 'submitted_at'    => $isFinalSubmit && !$submission->submitted_at ? now() : $submission->submitted_at,
             ]);
+
+            $this->updateEquipmentCalibration($submission->equipment_unit_id, $payload);
 
             // Delete old answers
             $submission->answers()->delete();
@@ -166,6 +171,19 @@ class SubmissionService
         }
 
         return $warningCount;
+    }
+
+    protected function updateEquipmentCalibration(int $equipmentUnitId, array $payload): void
+    {
+        if (! array_key_exists('tanggal_kalibrasi_terakhir', $payload)
+            && ! array_key_exists('tanggal_kalibrasi_berikutnya', $payload)) {
+            return;
+        }
+
+        EquipmentUnit::whereKey($equipmentUnitId)->update([
+            'tanggal_kalibrasi_terakhir' => $payload['tanggal_kalibrasi_terakhir'] ?? null,
+            'tanggal_kalibrasi_berikutnya' => $payload['tanggal_kalibrasi_berikutnya'] ?? null,
+        ]);
     }
 
     protected function assignValue(QcAnswer $answer, FormField $field, mixed $rawValue, string $column): void

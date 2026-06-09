@@ -90,13 +90,6 @@ interface SubmitProps {
 
 export default function Submit({ equipmentUnit, template, qcType }: SubmitProps) {
     const today = new Date().toISOString().split('T')[0];
-    const formatDate = (date: string | null) => date
-        ? new Date(date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
-        : 'Belum diisi';
-    const nextCalibrationDate = equipmentUnit.tanggal_kalibrasi_berikutnya
-        ? new Date(equipmentUnit.tanggal_kalibrasi_berikutnya)
-        : null;
-    const calibrationOverdue = nextCalibrationDate ? nextCalibrationDate < new Date(new Date().toDateString()) : false;
     const normalizeQuestionSectionTitle = (title: string) =>
         title.replace(/^Pertanyaan\s+(Harian|Bulanan|Tahunan)$/i, 'Pertanyaan');
 
@@ -128,10 +121,17 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
         equipment_unit_id: equipmentUnit.id,
         qc_type: qcType,
         submission_date: today,
+        tanggal_kalibrasi_terakhir: equipmentUnit.tanggal_kalibrasi_terakhir?.substring(0, 10) ?? '',
+        tanggal_kalibrasi_berikutnya: equipmentUnit.tanggal_kalibrasi_berikutnya?.substring(0, 10) ?? '',
         answers: initialAnswers,
         catatan_masalah: '',
         submit: false,
     });
+
+    const nextCalibrationDate = data.tanggal_kalibrasi_berikutnya
+        ? new Date(data.tanggal_kalibrasi_berikutnya)
+        : null;
+    const calibrationOverdue = nextCalibrationDate ? nextCalibrationDate < new Date(new Date().toDateString()) : false;
 
     // Track active status for optional sections (hidden by default)
     const [activeOptionalSections, setActiveOptionalSections] = useState<Record<number, boolean>>(() => {
@@ -892,17 +892,32 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                                 "size-5 mt-0.5 shrink-0",
                                 calibrationOverdue ? "text-amber-500" : "text-slate-400"
                             )} />
-                            <div>
+                            <div className="w-full space-y-2">
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Data Kalibrasi Alat</p>
-                                <p className="text-xs text-slate-500">
-                                    Terakhir: <span className="font-semibold text-slate-700 dark:text-slate-300">{formatDate(equipmentUnit.tanggal_kalibrasi_terakhir)}</span>
-                                </p>
-                                <p className={cn(
-                                    "text-xs",
-                                    calibrationOverdue ? "font-bold text-amber-600 dark:text-amber-400" : "text-slate-500"
-                                )}>
-                                    Berikutnya: <span className="font-semibold">{formatDate(equipmentUnit.tanggal_kalibrasi_berikutnya)}</span>
-                                </p>
+                                <label className="block space-y-1">
+                                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Kalibrasi Terakhir</span>
+                                    <input
+                                        type="date"
+                                        value={data.tanggal_kalibrasi_terakhir}
+                                        onChange={e => setData('tanggal_kalibrasi_terakhir', e.target.value)}
+                                        className="w-full text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 outline-none font-semibold focus:border-indigo-500"
+                                    />
+                                </label>
+                                <label className="block space-y-1">
+                                    <span className={cn(
+                                        "text-[10px] font-semibold",
+                                        calibrationOverdue ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"
+                                    )}>Kalibrasi Berikutnya</span>
+                                    <input
+                                        type="date"
+                                        value={data.tanggal_kalibrasi_berikutnya}
+                                        onChange={e => setData('tanggal_kalibrasi_berikutnya', e.target.value)}
+                                        className={cn(
+                                            "w-full text-xs bg-slate-50 dark:bg-slate-950 border rounded px-1.5 py-1 outline-none font-semibold focus:border-indigo-500",
+                                            calibrationOverdue ? "border-amber-300 dark:border-amber-600" : "border-slate-200 dark:border-slate-800"
+                                        )}
+                                    />
+                                </label>
                             </div>
                         </div>
                     </div>
