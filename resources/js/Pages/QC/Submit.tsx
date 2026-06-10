@@ -91,6 +91,7 @@ interface SubmitProps {
 
 export default function Submit({ equipmentUnit, template, qcType }: SubmitProps) {
     const today = new Date().toISOString().split('T')[0];
+    const isAnnualQc = qcType === 'tahunan';
     const normalizeQuestionSectionTitle = (title: string) =>
         title.replace(/^Pertanyaan\s+(Harian|Bulanan|Tahunan)$/i, 'Pertanyaan');
 
@@ -855,7 +856,7 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
 
                 {/* Equipment Unit Meta Card */}
                 <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 shadow-xs">
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+                    <div className={cn("grid grid-cols-1 gap-5", isAnnualQc ? "md:grid-cols-4" : "md:grid-cols-3")}>
                         <div className="flex items-start gap-3">
                             <Building className="size-5 text-slate-400 mt-0.5 shrink-0" />
                             <div>
@@ -889,49 +890,51 @@ export default function Submit({ equipmentUnit, template, qcType }: SubmitProps)
                             </div>
                         </div>
 
-                        <div className="flex items-start gap-3">
-                            <AlertTriangle className={cn(
-                                "size-5 mt-0.5 shrink-0",
-                                calibrationOverdue ? "text-amber-500" : "text-slate-400"
-                            )} />
-                            <div className="w-full space-y-2">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Izin & Kalibrasi Alat</p>
-                                <label className="block space-y-1">
-                                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Nomor Izin Operasional</span>
-                                    <input
-                                        type="text"
-                                        value={data.nomor_izin_operasional}
-                                        onChange={e => setData('nomor_izin_operasional', e.target.value)}
-                                        placeholder="Belum diisi"
-                                        className="w-full text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 outline-none font-mono font-semibold focus:border-indigo-500"
-                                    />
-                                </label>
-                                <label className="block space-y-1">
-                                    <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Kalibrasi Terakhir</span>
-                                    <input
-                                        type="date"
-                                        value={data.tanggal_kalibrasi_terakhir}
-                                        onChange={e => setData('tanggal_kalibrasi_terakhir', e.target.value)}
-                                        className="w-full text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 outline-none font-semibold focus:border-indigo-500"
-                                    />
-                                </label>
-                                <label className="block space-y-1">
-                                    <span className={cn(
-                                        "text-[10px] font-semibold",
-                                        calibrationOverdue ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"
-                                    )}>Kalibrasi Berikutnya</span>
-                                    <input
-                                        type="date"
-                                        value={data.tanggal_kalibrasi_berikutnya}
-                                        onChange={e => setData('tanggal_kalibrasi_berikutnya', e.target.value)}
-                                        className={cn(
-                                            "w-full text-xs bg-slate-50 dark:bg-slate-950 border rounded px-1.5 py-1 outline-none font-semibold focus:border-indigo-500",
-                                            calibrationOverdue ? "border-amber-300 dark:border-amber-600" : "border-slate-200 dark:border-slate-800"
-                                        )}
-                                    />
-                                </label>
+                        {isAnnualQc && (
+                            <div className="flex items-start gap-3">
+                                <AlertTriangle className={cn(
+                                    "size-5 mt-0.5 shrink-0",
+                                    calibrationOverdue ? "text-amber-500" : "text-slate-400"
+                                )} />
+                                <div className="w-full space-y-2">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Izin & Kalibrasi Alat</p>
+                                    <label className="block space-y-1">
+                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Nomor Izin Operasional</span>
+                                        <input
+                                            type="text"
+                                            value={data.nomor_izin_operasional}
+                                            onChange={e => setData('nomor_izin_operasional', e.target.value)}
+                                            placeholder="Belum diisi"
+                                            className="w-full text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 outline-none font-mono font-semibold focus:border-indigo-500"
+                                        />
+                                    </label>
+                                    <label className="block space-y-1">
+                                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Kalibrasi Terakhir</span>
+                                        <input
+                                            type="date"
+                                            value={data.tanggal_kalibrasi_terakhir}
+                                            onChange={e => setData('tanggal_kalibrasi_terakhir', e.target.value)}
+                                            className="w-full text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 outline-none font-semibold focus:border-indigo-500"
+                                        />
+                                    </label>
+                                    <label className="block space-y-1">
+                                        <span className={cn(
+                                            "text-[10px] font-semibold",
+                                            calibrationOverdue ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400"
+                                        )}>Kalibrasi Berikutnya</span>
+                                        <input
+                                            type="date"
+                                            value={data.tanggal_kalibrasi_berikutnya}
+                                            onChange={e => setData('tanggal_kalibrasi_berikutnya', e.target.value)}
+                                            className={cn(
+                                                "w-full text-xs bg-slate-50 dark:bg-slate-950 border rounded px-1.5 py-1 outline-none font-semibold focus:border-indigo-500",
+                                                calibrationOverdue ? "border-amber-300 dark:border-amber-600" : "border-slate-200 dark:border-slate-800"
+                                            )}
+                                        />
+                                    </label>
+                                </div>
                             </div>
-                        </div>
+                        )}
                     </div>
                 </div>
 

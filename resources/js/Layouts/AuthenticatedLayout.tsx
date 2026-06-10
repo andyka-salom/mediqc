@@ -81,7 +81,8 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
         user?.role?.permissions?.['qc.submit'] === true || 
         (Array.isArray(user?.role?.permissions?.['qc.submit']) && user.role.permissions['qc.submit'].length > 0);
     const canManageEquipment = user?.role?.permissions?.['equipment.manage'] === true || user?.role?.name === 'admin';
-    const calibrationWarningHref = canManageEquipment ? route('admin.equipment.index') : route('qc.select-unit');
+    const hasCalibrationWarnings = !!calibrationWarnings?.length;
+    const calibrationWarningHref = canManageEquipment ? route('admin.equipment.index') : route('qc.index');
 
     const navigation = [
         {
@@ -210,9 +211,11 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                     ))}
 
                     {/* Admin Navigation Section */}
-                    {adminNavigation.length > 0 && (
+                    {(adminNavigation.length > 0 || hasCalibrationWarnings) && (
                         <div className="pt-6 border-t border-slate-100 dark:border-slate-800 mt-6">
-                            <p className="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Administrasi</p>
+                            {adminNavigation.length > 0 && (
+                                <p className="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Administrasi</p>
+                            )}
                             <div className="space-y-1">
                                 {adminNavigation.map((item) => (
                                     <Link
@@ -236,7 +239,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                 ))}
                                 
                                 {/* Calibration Warnings Dropdown */}
-                                {calibrationWarnings && calibrationWarnings.length > 0 && (
+                                {hasCalibrationWarnings && (
                                     <div className="mt-4 p-3 bg-gradient-to-r from-rose-50 to-rose-100/50 dark:from-rose-950/40 dark:to-rose-900/20 rounded-xl border border-rose-200/60 dark:border-rose-800/60 shadow-sm relative overflow-hidden group/warning">
                                         {/* Subtle background glow effect */}
                                         <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none transition-opacity group-hover/warning:opacity-40">
@@ -252,7 +255,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                                 </div>
                                                 <span className="flex-1 text-left">Peringatan Kalibrasi</span>
                                                 <span className="bg-rose-600 text-white dark:bg-rose-500 py-0.5 px-2.5 rounded-full text-[10px] font-black shadow-md shadow-rose-500/30">
-                                                    {calibrationWarnings.length}
+                                                    {calibrationWarnings?.length}
                                                 </span>
                                             </div>
                                             <ChevronRight className={cn("size-4 text-rose-500 transition-transform duration-300", calibrationOpen && "rotate-90")} />
@@ -260,7 +263,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                         
                                         {calibrationOpen && (
                                             <div className="relative z-10 mt-3 pt-3 space-y-1.5 border-t border-rose-200/60 dark:border-rose-800/60 animate-in slide-in-from-top-2 fade-in duration-200 ease-out">
-                                                {calibrationWarnings.map(warning => (
+                                                {calibrationWarnings?.map(warning => (
                                                     <Link 
                                                         key={warning.id}
                                                         href={calibrationWarningHref}
@@ -352,9 +355,11 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                             ))}
 
                             {/* Mobile Admin Navigation */}
-                            {adminNavigation.length > 0 && (
+                            {(adminNavigation.length > 0 || hasCalibrationWarnings) && (
                                 <div className="pt-6 border-t border-slate-100 dark:border-slate-800 mt-6">
-                                    <p className="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Administrasi</p>
+                                    {adminNavigation.length > 0 && (
+                                        <p className="px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Administrasi</p>
+                                    )}
                                     <div className="space-y-1">
                                         {adminNavigation.map((item) => (
                                             <Link
@@ -376,7 +381,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                         ))}
 
                                         {/* Mobile Calibration Warnings Dropdown */}
-                                        {calibrationWarnings && calibrationWarnings.length > 0 && (
+                                        {hasCalibrationWarnings && (
                                             <div className="mt-4 p-3 bg-gradient-to-r from-rose-50 to-rose-100/50 dark:from-rose-950/40 dark:to-rose-900/20 rounded-xl border border-rose-200/60 dark:border-rose-800/60 shadow-sm relative overflow-hidden group/warning">
                                                 {/* Subtle background glow effect */}
                                                 <div className="absolute top-0 right-0 p-4 opacity-20 pointer-events-none transition-opacity group-hover/warning:opacity-40">
@@ -392,7 +397,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                                         </div>
                                                         <span className="flex-1 text-left">Peringatan Kalibrasi</span>
                                                         <span className="bg-rose-600 text-white dark:bg-rose-500 py-0.5 px-2.5 rounded-full text-[10px] font-black shadow-md shadow-rose-500/30">
-                                                            {calibrationWarnings.length}
+                                                            {calibrationWarnings?.length}
                                                         </span>
                                                     </div>
                                                     <ChevronRight className={cn("size-4 text-rose-500 transition-transform duration-300", calibrationOpen && "rotate-90")} />
@@ -400,7 +405,7 @@ export default function AuthenticatedLayout({ children }: { children: React.Reac
                                                 
                                                 {calibrationOpen && (
                                                     <div className="relative z-10 mt-3 pt-3 space-y-1.5 border-t border-rose-200/60 dark:border-rose-800/60 animate-in slide-in-from-top-2 fade-in duration-200 ease-out">
-                                                        {calibrationWarnings.map(warning => (
+                                                        {calibrationWarnings?.map(warning => (
                                                             <Link 
                                                                 key={warning.id}
                                                                 href={calibrationWarningHref}
