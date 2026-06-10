@@ -106,8 +106,8 @@ class QcController extends Controller
         $submissions = $query->get();
 
         $headers = [
-            'Content-Type' => 'text/csv; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="riwayat_qc_' . now()->format('Ymd_His') . '.csv"',
+            'Content-Type' => 'application/vnd.ms-excel; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="riwayat_qc_' . now()->format('Ymd_His') . '.xls"',
             'Pragma' => 'no-cache',
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
@@ -115,12 +115,14 @@ class QcController extends Controller
 
         $callback = function () use ($submissions) {
             $file = fopen('php://output', 'w');
-            
-            // Write UTF-8 BOM for Excel
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
-            
-            // Header Row
-            fputcsv($file, [
+
+            $excelEscape = fn ($value) => htmlspecialchars((string) ($value ?? ''), ENT_QUOTES | ENT_XML1 | ENT_SUBSTITUTE, 'UTF-8');
+            $writeCell = function ($value, string $type = 'String', ?string $styleId = null) use ($file, $excelEscape) {
+                $style = $styleId ? ' ss:StyleID="'.$styleId.'"' : '';
+                fwrite($file, '<Cell'.$style.'><Data ss:Type="'.$type.'">'.$excelEscape($value).'</Data></Cell>');
+            };
+
+            $columns = [
                 'No',
                 'Tanggal',
                 'Nama Alat Medis',
@@ -135,8 +137,26 @@ class QcController extends Controller
                 'Status',
                 'Jumlah Peringatan',
                 'Catatan Masalah'
-            ], ';');
-            
+            ];
+
+            fwrite($file, '<?xml version="1.0" encoding="UTF-8"?>');
+            fwrite($file, '<?mso-application progid="Excel.Sheet"?>');
+            fwrite($file, '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ');
+            fwrite($file, 'xmlns:o="urn:schemas-microsoft-com:office:office" ');
+            fwrite($file, 'xmlns:x="urn:schemas-microsoft-com:office:excel" ');
+            fwrite($file, 'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" ');
+            fwrite($file, 'xmlns:html="http://www.w3.org/TR/REC-html40">');
+            fwrite($file, '<Styles>');
+            fwrite($file, '<Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#E2E8F0" ss:Pattern="Solid"/></Style>');
+            fwrite($file, '</Styles>');
+            fwrite($file, '<Worksheet ss:Name="Riwayat QC"><Table>');
+
+            fwrite($file, '<Row>');
+            foreach ($columns as $column) {
+                $writeCell($column, 'String', 'Header');
+            }
+            fwrite($file, '</Row>');
+
             foreach ($submissions as $index => $sub) {
                 $statusLabel = 'Draft';
                 if ($sub->overall_status === 'submitted') {
@@ -145,24 +165,25 @@ class QcController extends Controller
                     $statusLabel = 'Perlu Tindakan';
                 }
 
-                fputcsv($file, [
-                    $index + 1,
-                    $sub->submission_date,
-                    $sub->equipmentUnit ? $sub->equipmentUnit->name : '—',
-                    $sub->equipmentUnit ? $sub->equipmentUnit->asset_code : '—',
-                    $sub->equipmentUnit ? $sub->equipmentUnit->merk : '—',
-                    $sub->equipmentUnit ? $sub->equipmentUnit->model : '—',
-                    $sub->equipmentUnit?->nomor_izin_operasional ?? '—',
-                    $sub->equipmentUnit?->tanggal_kalibrasi_terakhir?->format('Y-m-d') ?? '—',
-                    $sub->equipmentUnit?->tanggal_kalibrasi_berikutnya?->format('Y-m-d') ?? '—',
-                    ucfirst($sub->qc_type),
-                    $sub->submitter ? $sub->submitter->name : '—',
-                    $statusLabel,
-                    $sub->warning_count,
-                    $sub->catatan_masalah ?? '—'
-                ], ';');
+                fwrite($file, '<Row>');
+                $writeCell($index + 1, 'Number');
+                $writeCell($sub->submission_date);
+                $writeCell($sub->equipmentUnit?->name ?? '-');
+                $writeCell($sub->equipmentUnit?->asset_code ?? '-');
+                $writeCell($sub->equipmentUnit?->merk ?? '-');
+                $writeCell($sub->equipmentUnit?->model ?? '-');
+                $writeCell($sub->equipmentUnit?->nomor_izin_operasional ?? '-');
+                $writeCell($sub->equipmentUnit?->tanggal_kalibrasi_terakhir?->format('Y-m-d') ?? '-');
+                $writeCell($sub->equipmentUnit?->tanggal_kalibrasi_berikutnya?->format('Y-m-d') ?? '-');
+                $writeCell(ucfirst($sub->qc_type));
+                $writeCell($sub->submitter?->name ?? '-');
+                $writeCell($statusLabel);
+                $writeCell($sub->warning_count, 'Number');
+                $writeCell($sub->catatan_masalah ?? '-');
+                fwrite($file, '</Row>');
             }
 
+            fwrite($file, '</Table></Worksheet></Workbook>');
             fclose($file);
         };
 
